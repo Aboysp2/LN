@@ -1,6 +1,6 @@
-const CACHE\_NAME = "labarkouh-news-v1";
+const CACHE_NAME = "labarkouh-news-v2";
 
-const STATIC\_FILES = [
+const STATIC_FILES = [
   "./",
   "./index.html",
   "./script.js",
@@ -9,56 +9,43 @@ const STATIC\_FILES = [
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(CACHE\_NAME).then((cache) => {
-      return cache.addAll(STATIC\_FILES);
-    })
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(STATIC_FILES))
   );
-
   self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
+    caches.keys().then((cacheNames) =>
+      Promise.all(
         cacheNames
-          .filter((cacheName) => cacheName !== CACHE\_NAME)
-          .map((cacheName) => caches.delete(cacheName))
-      );
-    })
+          .filter((name) => name !== CACHE_NAME)
+          .map((name) => caches.delete(name))
+      )
+    )
   );
-
   self.clients.claim();
 });
 
 self.addEventListener("fetch", (event) => {
-  if (event.request.method !== "GET") {
-    return;
-  }
+  if (event.request.method !== "GET") return;
 
   event.respondWith(
     fetch(event.request)
       .then((response) => {
-        const responseClone = response.clone();
-
-        caches.open(CACHE\_NAME).then((cache) => {
-          cache.put(event.request, responseClone);
-        });
-
+        const clone = response.clone();
+        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
         return response;
       })
-      .catch(() => {
-        return caches.match(event.request).then((cachedResponse) => {
-          return (
-            cachedResponse ||
+      .catch(() =>
+        caches.match(event.request).then(
+          (cached) =>
+            cached ||
             new Response("لا يوجد اتصال بالإنترنت", {
               status: 503,
-              headers: {
-                "Content-Type": "text/plain; charset=utf-8"
-              }
+              headers: { "Content-Type": "text/plain; charset=utf-8" }
             })
-          );
-        });
-      })
+        )
+      )
   );
 });
