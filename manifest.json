@@ -1,0 +1,24 @@
+{
+  "name": "Labarkouh News",
+  "short\_name": "Labarkouh News",
+  "description": "أخبار تشاد وأفريقيا والعالم والرياضة",
+  "start\_url": "./index.html",
+  "display": "standalone",
+  "background\_color": "#f1f5f9",
+  "theme\_color": "#0f172a",
+  "orientation": "portrait",
+  "lang": "ar",
+  "dir": "rtl",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
