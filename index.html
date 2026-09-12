@@ -1,0 +1,853 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  />
+
+  <meta
+    name="theme-color"
+    content="#0f172a"
+  />
+
+  <meta
+    name="description"
+    content="لاباركوه نيوز - أخبار تشاد وأفريقيا والعالم والرياضة"
+  />
+
+  <title>لاباركوه نيوز | Labarkouh News</title>
+
+  <link rel="manifest" href="manifest.json" />
+
+  <style>
+    :root {
+      --primary: #dc2626;
+      --dark: #0f172a;
+      --gray: #64748b;
+      --light: #f1f5f9;
+      --white: #ffffff;
+      --border: #e2e8f0;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: var(--light);
+      color: var(--dark);
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    button,
+    select {
+      font-family: inherit;
+    }
+
+    button {
+      cursor: pointer;
+    }
+
+    .top-header {
+      background: var(--dark);
+      color: var(--white);
+      padding: 22px 16px;
+    }
+
+    .header-content {
+      width: min(1100px, 100%);
+      margin: auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+    }
+
+    .brand-small {
+      color: #f87171;
+      font-size: 12px;
+      font-weight: bold;
+      letter-spacing: 2px;
+      margin-bottom: 5px;
+    }
+
+    .brand-title {
+      font-size: clamp(25px, 5vw, 40px);
+      font-weight: 900;
+    }
+
+    .brand-description {
+      color: #cbd5e1;
+      margin-top: 8px;
+      font-size: 14px;
+    }
+
+    .language-select {
+      border: 0;
+      border-radius: 8px;
+      padding: 10px 12px;
+      background: white;
+      color: var(--dark);
+      font-size: 14px;
+      outline: none;
+    }
+
+    .category-bar {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: white;
+      border-bottom: 1px solid var(--border);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    }
+
+    .categories {
+      width: min(1100px, 100%);
+      margin: auto;
+      padding: 12px 16px;
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+    }
+
+    .category-button {
+      border: 0;
+      border-radius: 999px;
+      background: #f1f5f9;
+      color: #334155;
+      padding: 10px 18px;
+      white-space: nowrap;
+      font-size: 14px;
+      font-weight: bold;
+      transition: 0.2s;
+    }
+
+    .category-button:hover {
+      background: #e2e8f0;
+    }
+
+    .category-button.active {
+      background: var(--primary);
+      color: white;
+    }
+
+    .main-content {
+      width: min(1100px, 100%);
+      margin: auto;
+      padding: 25px## 1. ملف `index.html`
+
+```html
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <meta name="theme-color" content="#0f172a" />
+  <meta
+    name="description"
+    content="لاباركوه نيوز - أخبار تشاد وأفريقيا والعالم والرياضة"
+  />
+
+  <title>لاباركوه نيوز | Labarkouh News</title>
+
+  <link rel="manifest" href="manifest.json" />
+
+  <style>
+    :root {
+      --primary: #dc2626;
+      --dark: #0f172a;
+      --gray: #64748b;
+      --light: #f1f5f9;
+      --white: #ffffff;
+      --border: #e2e8f0;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: var(--light);
+      color: var(--dark);
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    button,
+    select {
+      font-family: inherit;
+    }
+
+    button {
+      cursor: pointer;
+    }
+
+    .top-header {
+      background: var(--dark);
+      color: white;
+      padding: 22px 16px;
+    }
+
+    .header-content,
+    .main-content,
+    .categories {
+      width: min(1100px, 100%);
+      margin: auto;
+    }
+
+    .header-content {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+    }
+
+    .brand-small {
+      color: #f87171;
+      font-size: 12px;
+      font-weight: bold;
+      letter-spacing: 2px;
+      margin-bottom: 5px;
+    }
+
+    .brand-title {
+      font-size: clamp(25px, 5vw, 40px);
+      font-weight: 900;
+    }
+
+    .brand-description {
+      color: #cbd5e1;
+      margin-top: 8px;
+      font-size: 14px;
+    }
+
+    .language-select {
+      border: 0;
+      border-radius: 8px;
+      padding: 10px 12px;
+      background: white;
+      color: var(--dark);
+      font-size: 14px;
+      outline: none;
+    }
+
+    .category-bar {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: white;
+      border-bottom: 1px solid var(--border);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    }
+
+    .categories {
+      padding: 12px 16px;
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+    }
+
+    .category-button {
+      border: 0;
+      border-radius: 999px;
+      background: #f1f5f9;
+      color: #334155;
+      padding: 10px 18px;
+      white-space: nowrap;
+      font-size: 14px;
+      font-weight: bold;
+    }
+
+    .category-button.active {
+      background: var(--primary);
+      color: white;
+    }
+
+    .main-content {
+      padding: 25px 16px;
+    }
+
+    .section-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 15px;
+      margin-bottom: 20px;
+    }
+
+    .section-title {
+      font-size: 26px;
+      font-weight: 900;
+    }
+
+    .refresh-button {
+      border: 0;
+      border-radius: 8px;
+      background: var(--dark);
+      color: white;
+      padding: 10px 15px;
+      font-weight: bold;
+    }
+
+    .news-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+    }
+
+    .news-card {
+      overflow: hidden;
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      box-shadow: 0 3px 12px rgba(15, 23, 42, 0.05);
+    }
+
+    .news-image {
+      width: 100%;
+      height: 190px;
+      object-fit: cover;
+      background: #cbd5e1;
+    }
+
+    .news-content {
+      padding: 16px;
+    }
+
+    .news-meta {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      color: var(--gray);
+      font-size: 12px;
+      margin-bottom: 10px;
+    }
+
+    .news-title {
+      font-size: 18px;
+      line-height: 1.6;
+      margin-bottom: 10px;
+    }
+
+    .news-description {
+      color: #475569;
+      font-size: 14px;
+      line-height: 1.7;
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .read-link {
+      display: inline-block;
+      margin-top: 15px;
+      color: var(--primary);
+      text-decoration: none;
+      font-weight: bold;
+    }
+
+    .status-message {
+      text-align: center;
+      background: white;
+      color: var(--gray);
+      border-radius: 12px;
+      padding: 35px 15px;
+    }
+
+    .footer {
+      margin-top: 35px;
+      background: var(--dark);
+      color: #94a3b8;
+      text-align: center;
+      padding: 25px 15px;
+      font-size: 14px;
+    }
+
+    @media (max-width: 850px) {
+      .news-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+
+    @media (max-width: 600px) {
+      .header-content {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .language-select {
+        width: 100%;
+      }
+
+      .news-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .section-title {
+        font-size: 22px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <header class="top-header">
+    <div class="header-content">
+      <div>
+        <div class="brand-small">LIVE NEWS</div>
+        <h1 class="brand-title" id="appName">لاباركوه نيوز</h1>
+        <p class="brand-description" id="appDescription">
+          أخبار تشاد وأفريقيا والعالم والرياضة
+        </p>
+      </div>
+
+      <select id="languageSelect" class="language-select">
+        <option value="ar">العربية</option>
+        <option value="fr">Français</option>
+        <option value="en">English</option>
+      </select>
+    </div>
+  </header>
+
+  <nav class="category-bar">
+    <div class="categories" id="categories">
+      <button class="category-button active" data-category="breaking">
+        عاجل
+      </button>
+
+      <button class="category-button" data-category="chad">
+        تشاد
+      </button>
+
+      <button class="category-button" data-category="africa">
+        أفريقيا
+      </button>
+
+      <button class="category-button" data-category="world">
+        العالم
+      </button>
+
+      <button class="category-button" data-category="sports">
+        الرياضة
+      </button>
+    </div>
+  </nav>
+
+  <main class="main-content">
+    <div class="section-head">
+      <h2 class="section-title" id="sectionTitle">آخر الأخبار</h2>
+
+      <button class="refresh-button" id="refreshButton">
+        تحديث
+      </button>
+    </div>
+
+    <section id="newsContainer" class="news-grid"></section>
+  </main>
+
+  <footer class="footer">
+    © <span id="currentYear"></span> Labarkouh News
+  </footer>
+
+  <script src## 2. ملف `script.js`
+
+```javascript
+const CONFIG = {
+  // ضع رابط API الخاص بك هنا عند استخدام خادم أخبار حقيقي
+  apiUrl: "",
+
+  // لا تضع مفتاح NewsAPI داخل هذا الملف عند رفعه للعامة
+  apiKey: "",
+
+  useDemoData: true
+};
+
+const translations = {
+  ar: {
+    direction: "rtl",
+    name: "لاباركوه نيوز",
+    description: "أخبار تشاد وأفريقيا والعالم والرياضة",
+    latest: "آخر الأخبار",
+    loading: "جاري تحميل الأخبار...",
+    noNews: "لا توجد أخبار متاحة حاليًا.",
+    error: "حدث خطأ أثناء تحميل الأخبار.",
+    refresh: "تحديث",
+    read: "اقرأ الخبر",
+    categories: {
+      breaking: "عاجل",
+      chad: "تشاد",
+      africa: "أفريقيا",
+      world: "العالم",
+      sports: "الرياضة"
+    }
+  },
+
+  fr: {
+    direction: "ltr",
+    name: "Labarkouh News",
+    description: "Actualités du Tchad, d'Afrique, du monde et du sport",
+    latest: "Dernières nouvelles",
+    loading: "Chargement des nouvelles...",
+    noNews: "Aucune nouvelle disponible.",
+    error: "Une erreur est survenue.",
+    refresh: "Actualiser",
+    read: "Lire l'article",
+    categories: {
+      breaking: "Urgent",
+      chad: "Tchad",
+      africa: "Afrique",
+      world: "Monde",
+      sports: "Sports"
+    }
+  },
+
+  en: {
+    direction: "ltr",
+    name: "Labarkouh News",
+    description: "News from Chad, Africa, the world and sports",
+    latest: "Latest News",
+    loading: "Loading news...",
+    noNews: "No news available at the moment.",
+    error: "An error occurred while loading news.",
+    refresh: "Refresh",
+    read: "Read article",
+    categories: {
+      breaking: "Breaking",
+      chad: "Chad",
+      africa: "Africa",
+      world: "World",
+      sports: "Sports"
+    }
+  }
+};
+
+const demoNews = {
+  breaking: [
+    {
+      title: "آخر الأخبار العاجلة من تشاد وأفريقيا",
+      description: "تابع أهم المستجدات والأخبار العاجلة لحظة بلحظة.",
+      source: "Labarkouh News",
+      publishedAt: new Date().toISOString(),
+      image: "https://images.unsplash.com/photo-1529107386315-e1a2ed48a620",
+      url: "https://www.google.com/search?q=Chad+latest+news"
+    },
+    {
+      title: "تطورات جديدة في القارة الأفريقية",
+      description: "تغطية مستمرة لأبرز الأحداث في أفريقيا والعالم.",
+      source: "Africa News",
+      publishedAt: new Date().toISOString(),
+      image: "https://images.unsplash.com/photo-1516026672322-bc52d61a55d5",
+      url: "https://www.google.com/search?q=Africa+latest+news"
+    }
+  ],
+
+  chad: [
+    {
+      title: "أخبار تشاد اليوم",
+      description: "أهم الأخبار السياسية والاقتصادية والاجتماعية من تشاد.",
+      source: "Chad News",
+      publishedAt: new Date().toISOString(),
+      image: "https://images.unsplash.com/photo-1548013146-72479768bada",
+      url: "https://www.google.com/search?q=Chad+news"
+    },
+    {
+      title: "مستجدات الأحداث في تشاد",
+      description: "آخر التطورات والأحداث المحلية في مختلف مناطق تشاد.",
+      source: "Labarkouh News",
+      publishedAt: new Date().toISOString(),
+      image: "https://images.unsplash.com/photo-1539650116574-75c0c6d73f6e",
+      url: "https://www.google.com/search?q=Tchad+actualites"
+    }
+  ],
+
+  africa: [
+    {
+      title: "أبرز أخبار أفريقيا",
+      description: "تغطية شاملة للأخبار السياسية والاقتصادية في أفريقيا.",
+      source: "Africa News",
+      publishedAt: new Date().toISOString(),
+      image: "https://images.unsplash.com/photo-1539650116574-75c0c6d73f6e",
+      url: "https://www.google.com/search?q=Africa+news"
+    }
+  ],
+
+  world: [
+    {
+      title: "أهم الأخبار العالمية",
+      description: "آخر الأخبار والتطورات من مختلف أنحاء العالم.",
+      source: "World News",
+      publishedAt: new Date().toISOString(),
+      image: "https://images.unsplash.com/photo-1521295121783-8a321d551ad2",
+      url: "https://news.google.com"
+    }
+  ],
+
+  sports: [
+    {
+      title: "آخر أخبار الرياضة",
+      description: "أهم نتائج ومباريات كرة القدم والرياضات العالمية.",
+      source: "Sports News",
+      publishedAt: new Date().toISOString(),
+      image: "https://images.unsplash.com/photo-1461896836934-ffe607ba8211",
+      url: "https://www.google.com/search?q=sports+latest+news"
+    }
+  ]
+};
+
+let currentLanguage = localStorage.getItem("language") || "ar";
+let currentCategory = "breaking";
+
+const appNameElement = document.getElementById("appName");
+const appDescriptionElement = document.getElementById("appDescription");
+const sectionTitleElement = document.getElementById("sectionTitle");
+const languageSelectElement = document.getElementById("languageSelect");
+const refreshButtonElement = document.getElementById("refreshButton");
+const newsContainerElement = document.getElementById("newsContainer");
+const categoryButtons = document.querySelectorAll(".category-button");
+const currentYearElement = document.getElementById("currentYear");
+
+function getCurrentText() {
+  return translations[currentLanguage];
+}
+
+function updateInterface() {
+  const text = getCurrentText();
+
+  document.documentElement.lang = currentLanguage;
+  document.documentElement.dir = text.direction;
+
+  appNameElement.textContent = text.name;
+  appDescriptionElement.textContent = text.description;
+  sectionTitleElement.textContent = text.latest;
+  refreshButtonElement.textContent = text.refresh;
+
+  categoryButtons.forEach((button) => {
+    const category = button.dataset.category;
+    button.textContent = text.categories[category];
+  });
+
+  languageSelectElement.value = currentLanguage;
+}
+
+function formatDate(dateValue) {
+ ```javascript
+  if (!dateValue) {
+    return "";
+  }
+
+  const locale =
+    currentLanguage === "ar"
+      ? "ar"
+      : currentLanguage === "fr"
+        ? "fr-FR"
+        : "en-US";
+
+  return new Date(dateValue).toLocaleDateString(locale, {
+    year: "numeric",
+    month: "short",
+    day: "numeric"
+  });
+}
+
+function showLoading() {
+  newsContainerElement.innerHTML = \`
+    <div class="status-message">
+      \${getCurrentText().loading}
+    </div>
+  \`;
+}
+
+function showMessage(message) {
+  newsContainerElement.innerHTML = \`
+    <div class="status-message">
+      \${message}
+    </div>
+  \`;
+}
+
+function escapeHtml(value) {
+  if (!value) {
+    return "";
+  }
+
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function normalizeArticle(article) {
+  return {
+    title: article.title || "Labarkouh News",
+    description: article.description || "",
+    source:
+      article.source?.name ||
+      article.source ||
+      "Labarkouh News",
+    publishedAt: article.publishedAt || article.published\_at,
+    image:
+      article.urlToImage ||
+      article.image ||
+      "https://images.unsplash.com/photo-1504711434969-e33886168f5c",
+    url: article.url || "#"
+  };
+}
+
+function renderNews(articles) {
+  const text = getCurrentText();
+
+  if (!articles || articles.length === 0) {
+    showMessage(text.noNews);
+    return;
+  }
+
+  newsContainerElement.innerHTML = articles
+    .map((rawArticle) => {
+      const article = normalizeArticle(rawArticle);
+
+      return \`
+        <article class="news-card">
+          <img
+            class="news-image"
+            src="\${escapeHtml(article.image)}"
+            alt=""
+            loading="lazy"
+            onerror="this.src='https://images.unsplash.com/photo-1504711434969-e33886168f5c'"
+          />
+
+          <div class="news-content">
+            <div class="news-meta">
+              <span>\${escapeHtml(article.source)}</span>
+              <span>\${formatDate(article.publishedAt)}</span>
+            </div>
+
+            <h3 class="news-title">
+              \${escapeHtml(article.title)}
+            </h3>
+
+            <p class="news-description">
+              \${escapeHtml(article.description)}
+            </p>
+
+            <a
+              class="read-link"
+              href="\${escapeHtml(article.url)}"
+              target="\_blank"
+              rel="noopener noreferrer"
+            >
+              \${text.read}
+            </a>
+          </div>
+        </article>
+      \`;
+    })
+    .join("");
+}
+
+async function fetchNewsFromApi() {
+  if (!CONFIG.apiUrl) {
+    throw new Error("API URL is not configured");
+  }
+
+  const url = new URL(CONFIG.apiUrl);
+
+  url.searchParams.set("category", currentCategory);
+  url.searchParams.set("language", currentLanguage);
+
+  if (CONFIG.apiKey) {
+    url.searchParams.set("apiKey", CONFIG.apiKey);
+  }
+
+  const response = await fetch(url.toString());
+
+  if (!response.ok) {
+    throw new Error("Failed to load news");
+  }
+
+  const data = await response.json();
+
+  return data.articles || data.results || [];
+}
+
+async function loadNews() {
+  showLoading();
+
+  try {
+    let articles;
+
+    if (CONFIG.useDemoData || !CONFIG.apiUrl) {
+      await new Promise((resolve) => {
+        setTimeout(resolve, 400);
+      });
+
+      articles = demoNews[currentCategory] || [];
+    } else {
+      articles = await fetchNewsFromApi();
+    }
+
+    renderNews(articles);
+  } catch (error) {
+    console.error(error);
+    showMessage(getCurrentText().error);
+  }
+}
+
+function selectCategory(category) {
+  currentCategory = category;
+
+  categoryButtons.forEach((button) => {
+    button.classList.toggle(
+      "active",
+      button.dataset.category === category
+    );
+  });
+
+  loadNews();
+}
+
+languageSelectElement.addEventListener("change", (event) => {
+  currentLanguage = event.target.value;
+
+  localStorage.setItem("language", currentLanguage);
+
+  updateInterface();
+  loadNews();
+});
+
+refreshButtonElement.addEventListener("click", () => {
+  loadNews();
+});
+
+categoryButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    selectCategory(button.dataset.category);
+  });
+});
+
+currentYearElement.textContent = new Date().getFullYear();
+
+updateInterface();
+loadNews();
+
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker
+      .register("./sw.js")
+      .then(() => {
+        console.log("Service Worker registered successfully");
+      })
+      .catch((error) => {
+        console.error("Service Worker registration failed:", error);
+      });
+  });
+}
