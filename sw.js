@@ -1,10 +1,12 @@
-const CACHE_NAME = "labarkouh-news-v4";
+const CACHE_NAME = "labarkouh-news-v5";
 
 const STATIC_FILES = [
   "./",
   "./index.html",
   "./script.js",
-  "./manifest.json"
+  "./manifest.json",
+  "./icon-192.png",
+  "./icon-512.png"
 ];
 
 self.addEventListener("install", (event) => {
@@ -31,10 +33,9 @@ self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
 
   const url = event.request.url;
-  const isApi = url.includes("rss2json.com") || url.includes("api.");
 
-  if (isApi) {
-    // Network first for news APIs
+  // Network-first للـ API (الأخبار)
+  if (url.includes("rss2json.com") || url.includes("allorigins.win") || url.includes("api.")) {
     event.respondWith(
       fetch(event.request)
         .then((response) => response)
@@ -43,23 +44,25 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Cache first for static files
+  // Cache-first للملفات الثابتة
   event.respondWith(
     caches.match(event.request).then((cached) => {
-      const networkFetch = fetch(event.request)
+      if (cached) return cached;
+
+      return fetch(event.request)
         .then((response) => {
-          if (response && response.status === 200) {
+          if (response && response.status === 200 && response.type === "basic") {
             const clone = response.clone();
             caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
           }
           return response;
         })
-        .catch(() => cached || new Response("لا يوجد اتصال بالإنترنت", {
-          status: 503,
-          headers: { "Content-Type": "text/plain; charset=utf-8" }
-        }));
-
-      return cached || networkFetch;
+        .catch(() =>
+          new Response("لا يوجد اتصال بالإنترنت", {
+            status: 503,
+            headers: { "Content-Type": "text/plain; charset=utf-8" }
+          })
+        );
     })
   );
 });
