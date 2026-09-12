@@ -1,46 +1,42 @@
 const CONFIG = {
   useLiveFeeds: true,
-  feedTimeoutMs: 8000,
+  feedTimeoutMs: 4500,          // أسرع timeout
+  maxArticles: 24,
+  cacheTTL: 8 * 60 * 1000,      // كاش 8 دقائق
   feeds: {
-    // عاجل + تشاد
     breaking: [
       { name: "Tchadinfos", url: "https://tchadinfos.com/feed/" },
       { name: "Alwihda Info", url: "https://www.alwihdainfo.com/xml/syndication.rss" },
-      { name: "Journal du Tchad", url: "https://www.journaldutchad.com/feed/" },
-      { name: "Africanews", url: "https://www.africanews.com/feed/" }
+      { name: "Journal du Tchad", url: "https://www.journaldutchad.com/feed/" }
     ],
     chad: [
       { name: "Tchadinfos", url: "https://tchadinfos.com/feed/" },
       { name: "Alwihda Info", url: "https://www.alwihdainfo.com/xml/syndication.rss" },
-      { name: "Journal du Tchad", url: "https://www.journaldutchad.com/feed/" },
-      { name: "Africanews", url: "https://www.africanews.com/feed/" }
+      { name: "Journal du Tchad", url: "https://www.journaldutchad.com/feed/" }
     ],
-    // أفريقيا
     africa: [
       { name: "Africanews", url: "https://www.africanews.com/feed/" },
       { name: "BBC Afrique", url: "https://feeds.bbci.co.uk/afrique/rss.xml" },
-      { name: "AllAfrica", url: "https://allafrica.com/tools/headlines/rdf/africa/headlines.rdf" },
       { name: "France 24 Afrique", url: "https://www.france24.com/fr/afrique/rss" },
       { name: "Al Jazeera", url: "https://www.aljazeera.com/xml/rss/all.xml" }
     ],
-    // العالم
     world: [
       { name: "BBC World", url: "https://feeds.bbci.co.uk/news/world/rss.xml" },
       { name: "Al Jazeera", url: "https://www.aljazeera.com/xml/rss/all.xml" },
       { name: "France 24", url: "https://www.france24.com/fr/rss" },
-      { name: "Reuters", url: "https://www.reutersagency.com/feed/?taxonomy=best-topics&post_type=best" },
       { name: "BBC News", url: "https://feeds.bbci.co.uk/news/rss.xml" }
     ],
-    // الرياضة
     sports: [
       { name: "BBC Sport", url: "https://feeds.bbci.co.uk/sport/rss.xml" },
-      { name: "Africanews Sport", url: "https://www.africanews.com/feed/rss?theme=sport" },
       { name: "France 24 Sport", url: "https://www.france24.com/fr/sports/rss" },
-      { name: "Al Jazeera Sport", url: "https://www.aljazeera.com/xml/rss/all.xml" },
-      { name: "Goal", url: "https://www.goal.com/feeds/en/news" }
+      { name: "Africanews", url: "https://www.africanews.com/feed/" }
     ]
   },
-  rss2jsonEndpoint: "https://api.rss2json.com/v1/api.json?rss_url="
+  // عدة بروكسيات لزيادة السرعة والموثوقية
+  proxies: [
+    "https://api.rss2json.com/v1/api.json?rss_url=",
+    "https://api.allorigins.win/get?url="
+  ]
 };
 
 const PLACEHOLDER_IMAGE =
@@ -119,6 +115,35 @@ const newsContainerElement = document.getElementById("newsContainer");
 const categoryButtons = document.querySelectorAll(".category-button");
 const currentYearElement = document.getElementById("currentYear");
 
+/* ===================== Cache helpers (سريع جداً) ===================== */
+function getCacheKey(category) {
+  return `labarkouh_${category}`;
+}
+
+function getCachedArticles(category) {
+  try {
+    const raw = localStorage.getItem(getCacheKey(category));
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    if (Date.now() - data.ts > CONFIG.cacheTTL) return null;
+    return data.articles;
+  } catch {
+    return null;
+  }
+}
+
+function setCachedArticles(category, articles) {
+  try {
+    localStorage.setItem(getCacheKey(category), JSON.stringify({
+      ts: Date.now(),
+      articles: articles.slice(0, CONFIG.maxArticles)
+    }));
+  } catch (e) {
+    // تجاهل إذا كان localStorage ممتلئاً
+  }
+}
+
+/* ===================== UI ===================== */
 function getCurrentText() {
   return translations[currentLanguage];
 }
@@ -158,7 +183,7 @@ function escapeHtml(value) {
 function stripHtml(html) {
   if (!html) return "";
   const withoutTags = html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
-  return withoutTags.length > 200 ? withoutTags.slice(0, 200) + "…" : withoutTags;
+  return withoutTags.length > 180 ? withoutTags.slice(0, 180) + "…" : withoutTags;
 }
 
 function extractImageFromHtml(html) {
@@ -195,7 +220,11 @@ function renderNews(articles) {
     showMessage(text.noNews);
     return;
   }
-  newsContainerElement.innerHTML = articles.map((rawArticle) => {
+  // استخدم DocumentFragment لسرعة أكبر
+  const fragment = document.createDocumentFragment();
+  const temp = document.createElement("div");
+
+  temp.innerHTML = articles.map((rawArticle) => {
     const article = normalizeArticle(rawArticle);
     return `
       <article class="news-card">
@@ -213,20 +242,31 @@ function renderNews(articles) {
       </article>
     `;
   }).join("");
+
+  while (temp.firstChild) {
+    fragment.appendChild(temp.firstChild);
+  }
+  newsContainerElement.innerHTML = "";
+  newsContainerElement.appendChild(fragment);
 }
 
+/* ===================== Fetch (محسّن للسرعة) ===================== */
 async function fetchOneFeed(feed) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), CONFIG.feedTimeoutMs);
+
   try {
-    const apiUrl = CONFIG.rss2jsonEndpoint + encodeURIComponent(feed.url);
+    // نستخدم rss2json أولاً (الأسرع والأكثر استقراراً)
+    const apiUrl = CONFIG.proxies[0] + encodeURIComponent(feed.url);
     const response = await fetch(apiUrl, { signal: controller.signal });
-    if (!response.ok) throw new Error("Feed request failed: " + feed.name);
+    if (!response.ok) throw new Error("HTTP " + response.status);
+
     const data = await response.json();
     if (data.status !== "ok" || !Array.isArray(data.items)) {
-      throw new Error("Feed parse failed: " + feed.name);
+      throw new Error("Parse failed");
     }
-    return data.items.map((item) => ({
+
+    return data.items.slice(0, 12).map((item) => ({
       title: item.title,
       description: stripHtml(item.description || item.content || ""),
       source: feed.name,
@@ -235,7 +275,7 @@ async function fetchOneFeed(feed) {
       url: item.link
     }));
   } catch (err) {
-    console.warn("Feed error:", feed.name, err.message);
+    console.warn("Feed skip:", feed.name, err.message);
     return [];
   } finally {
     clearTimeout(timeout);
@@ -246,40 +286,57 @@ async function fetchLiveCategory(category) {
   const feedList = CONFIG.feeds[category];
   if (!feedList || feedList.length === 0) return null;
 
-  const results = await Promise.allSettled(feedList.map(fetchOneFeed));
+  // جلب كل المصادر بالتوازي مع مهلة قصيرة
+  const results = await Promise.allSettled(
+    feedList.map(feed => fetchOneFeed(feed))
+  );
+
   const articles = results
-    .filter((r) => r.status === "fulfilled")
-    .flatMap((r) => r.value);
+    .filter(r => r.status === "fulfilled")
+    .flatMap(r => r.value);
 
   if (articles.length === 0) return null;
 
-  // إزالة التكرار حسب العنوان
+  // إزالة التكرار
   const seen = new Set();
-  const unique = articles.filter((a) => {
-    const key = (a.title || "").toLowerCase().trim();
-    if (!key || seen.has(key)) return false;
+  const unique = [];
+  for (const a of articles) {
+    const key = (a.title || "").toLowerCase().trim().slice(0, 80);
+    if (!key || seen.has(key)) continue;
     seen.add(key);
-    return true;
-  });
+    unique.push(a);
+  }
 
   unique.sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt));
-  return unique.slice(0, 30);
+  return unique.slice(0, CONFIG.maxArticles);
 }
 
-async function loadNews() {
+/* ===================== Main load (الأسرع) ===================== */
+async function loadNews(forceRefresh = false) {
   const myToken = ++requestToken;
   const text = getCurrentText();
 
-  showMessage(text.loading);
-  // عرض بيانات تجريبية فوراً
-  renderNews(demoNews[currentCategory] || []);
+  // 1. عرض الكاش فوراً إن وجد (أسرع تجربة مستخدم)
+  if (!forceRefresh) {
+    const cached = getCachedArticles(currentCategory);
+    if (cached && cached.length > 0) {
+      renderNews(cached);
+    } else {
+      showMessage(text.loading);
+      renderNews(demoNews[currentCategory] || []);
+    }
+  } else {
+    showMessage(text.loading);
+  }
 
   if (!CONFIG.useLiveFeeds || !CONFIG.feeds[currentCategory]) return;
 
   try {
     const liveArticles = await fetchLiveCategory(currentCategory);
-    if (myToken !== requestToken) return;
+    if (myToken !== requestToken) return; // تم تغيير الفئة
+
     if (liveArticles && liveArticles.length > 0) {
+      setCachedArticles(currentCategory, liveArticles);
       renderNews(liveArticles);
     }
   } catch (error) {
@@ -288,21 +345,26 @@ async function loadNews() {
 }
 
 function selectCategory(category) {
+  if (currentCategory === category) return;
   currentCategory = category;
   categoryButtons.forEach((button) => {
     button.classList.toggle("active", button.dataset.category === category);
   });
-  loadNews();
+  loadNews(false);
 }
 
 languageSelectElement.addEventListener("change", (event) => {
   currentLanguage = event.target.value;
   localStorage.setItem("language", currentLanguage);
   updateInterface();
-  loadNews();
+  loadNews(false);
 });
 
-refreshButtonElement.addEventListener("click", () => loadNews());
+refreshButtonElement.addEventListener("click", () => {
+  // مسح الكاش للفئة الحالية ثم إعادة التحميل
+  localStorage.removeItem(getCacheKey(currentCategory));
+  loadNews(true);
+});
 
 categoryButtons.forEach((button) => {
   button.addEventListener("click", () => selectCategory(button.dataset.category));
@@ -311,12 +373,12 @@ categoryButtons.forEach((button) => {
 currentYearElement.textContent = new Date().getFullYear();
 
 updateInterface();
-loadNews();
+loadNews(false);
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker.register("./sw.js")
-      .then(() => console.log("Service Worker registered"))
-      .catch((err) => console.error("SW registration failed:", err));
+      .then(() => console.log("SW ready"))
+      .catch((err) => console.error("SW failed:", err));
   });
 }
