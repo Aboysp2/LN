@@ -1,5 +1,6 @@
 const CONFIG = {
   useLiveFeeds: true,
+  feedTimeoutMs: 6000,
   feeds: {
     breaking: [
       { name: "Tchadinfos", url: "https://tchadinfos.com/feed/" },
@@ -45,26 +46,43 @@ const translations = {
   }
 };
 
+// Données de démo traduites dans les 3 langues (utilisées seulement si les flux réels échouent)
 const demoNews = {
-  breaking: [
-    { title: "آخر الأخبار العاجلة من تشاد وأفريقيا", description: "تابع أهم المستجدات والأخبار العاجلة لحظة بلحظة.", source: "Labarkouh News", publishedAt: new Date().toISOString(), image: PLACEHOLDER_IMAGE, url: "https://www.google.com/search?q=Chad+latest+news" }
-  ],
-  chad: [
-    { title: "أخبار تشاد اليوم", description: "أهم الأخبار السياسية والاقتصادية والاجتماعية من تشاد.", source: "Chad News", publishedAt: new Date().toISOString(), image: PLACEHOLDER_IMAGE, url: "https://www.google.com/search?q=Chad+news" }
-  ],
-  africa: [
-    { title: "أبرز أخبار أفريقيا", description: "تغطية شاملة للأخبار السياسية والاقتصادية في أفريقيا.", source: "Africa News", publishedAt: new Date().toISOString(), image: PLACEHOLDER_IMAGE, url: "https://www.google.com/search?q=Africa+news" }
-  ],
-  world: [
-    { title: "أهم الأخبار العالمية", description: "آخر الأخبار والتطورات من مختلف أنحاء العالم.", source: "World News", publishedAt: new Date().toISOString(), image: PLACEHOLDER_IMAGE, url: "https://news.google.com" }
-  ],
-  sports: [
-    { title: "آخر أخبار الرياضة", description: "أهم نتائج ومباريات كرة القدم والرياضات العالمية.", source: "Sports News", publishedAt: new Date().toISOString(), image: PLACEHOLDER_IMAGE, url: "https://www.google.com/search?q=sports+latest+news" }
-  ]
+  breaking: [{
+    title: { ar: "آخر الأخبار العاجلة من تشاد وأفريقيا", fr: "Dernières actualités urgentes du Tchad et d'Afrique", en: "Latest breaking news from Chad and Africa" },
+    description: { ar: "تابع أهم المستجدات والأخبار العاجلة لحظة بلحظة.", fr: "Suivez les principaux développements et les actualités urgentes en direct.", en: "Follow the latest developments and breaking news live." },
+    source: "Labarkouh News", publishedAt: new Date().toISOString(), image: PLACEHOLDER_IMAGE,
+    url: "https://www.google.com/search?q=Chad+latest+news"
+  }],
+  chad: [{
+    title: { ar: "أخبار تشاد اليوم", fr: "Actualités du Tchad aujourd'hui", en: "Chad news today" },
+    description: { ar: "أهم الأخبار السياسية والاقتصادية والاجتماعية من تشاد.", fr: "Les principales actualités politiques, économiques et sociales du Tchad.", en: "Top political, economic and social news from Chad." },
+    source: "Chad News", publishedAt: new Date().toISOString(), image: PLACEHOLDER_IMAGE,
+    url: "https://www.google.com/search?q=Chad+news"
+  }],
+  africa: [{
+    title: { ar: "أبرز أخبار أفريقيا", fr: "Principales actualités d'Afrique", en: "Top news from Africa" },
+    description: { ar: "تغطية شاملة للأخبار السياسية والاقتصادية في أفريقيا.", fr: "Couverture complète de l'actualité politique et économique en Afrique.", en: "Full coverage of political and economic news in Africa." },
+    source: "Africa News", publishedAt: new Date().toISOString(), image: PLACEHOLDER_IMAGE,
+    url: "https://www.google.com/search?q=Africa+news"
+  }],
+  world: [{
+    title: { ar: "أهم الأخبار العالمية", fr: "Principales actualités mondiales", en: "Top world news" },
+    description: { ar: "آخر الأخبار والتطورات من مختلف أنحاء العالم.", fr: "Les dernières actualités et développements à travers le monde.", en: "The latest news and developments around the world." },
+    source: "World News", publishedAt: new Date().toISOString(), image: PLACEHOLDER_IMAGE,
+    url: "https://news.google.com"
+  }],
+  sports: [{
+    title: { ar: "آخر أخبار الرياضة", fr: "Dernières actualités sportives", en: "Latest sports news" },
+    description: { ar: "أهم نتائج ومباريات كرة القدم والرياضات العالمية.", fr: "Les principaux résultats et matchs de football et de sports mondiaux.", en: "Top results and matches in football and world sports." },
+    source: "Sports News", publishedAt: new Date().toISOString(), image: PLACEHOLDER_IMAGE,
+    url: "https://www.google.com/search?q=sports+latest+news"
+  }]
 };
 
 let currentLanguage = localStorage.getItem("language") || "ar";
 let currentCategory = "breaking";
+let requestToken = 0; // pour ignorer les réponses obsolètes si l'utilisateur change vite d'onglet
 
 const appNameElement = document.getElementById("appName");
 const appDescriptionElement = document.getElementById("appDescription");
@@ -120,8 +138,12 @@ function extractImageFromHtml(html) {
   return match ? match[1] : null;
 }
 
-function showLoading() {
-  newsContainerElement.innerHTML = `<div class="status-message">${getCurrentText().loading}</div>`;
+function pickLang(value) {
+  // gère les champs multilingues des données de démo (objet {ar,fr,en}) et les chaînes normales des flux réels
+  if (value && typeof value === "object") {
+    return value[currentLanguage] || value.fr || value.ar || value.en || "";
+  }
+  return value || "";
 }
 
 function showMessage(message) {
@@ -130,8 +152,8 @@ function showMessage(message) {
 
 function normalizeArticle(article) {
   return {
-    title: article.title || "Labarkouh News",
-    description: article.description || "",
+    title: pickLang(article.title) || "Labarkouh News",
+    description: pickLang(article.description),
     source: article.source?.name || article.source || "Labarkouh News",
     publishedAt: article.publishedAt || new Date().toISOString(),
     image: article.image || PLACEHOLDER_IMAGE,
@@ -166,21 +188,27 @@ function renderNews(articles) {
 }
 
 async function fetchOneFeed(feed) {
-  const apiUrl = CONFIG.rss2jsonEndpoint + encodeURIComponent(feed.url);
-  const response = await fetch(apiUrl);
-  if (!response.ok) throw new Error("Feed request failed: " + feed.name);
-  const data = await response.json();
-  if (data.status !== "ok" || !Array.isArray(data.items)) {
-    throw new Error("Feed parse failed: " + feed.name);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), CONFIG.feedTimeoutMs);
+  try {
+    const apiUrl = CONFIG.rss2jsonEndpoint + encodeURIComponent(feed.url);
+    const response = await fetch(apiUrl, { signal: controller.signal });
+    if (!response.ok) throw new Error("Feed request failed: " + feed.name);
+    const data = await response.json();
+    if (data.status !== "ok" || !Array.isArray(data.items)) {
+      throw new Error("Feed parse failed: " + feed.name);
+    }
+    return data.items.map((item) => ({
+      title: item.title,
+      description: stripHtml(item.description),
+      source: feed.name,
+      publishedAt: item.pubDate,
+      image: item.thumbnail || item.enclosure?.link || extractImageFromHtml(item.description),
+      url: item.link
+    }));
+  } finally {
+    clearTimeout(timeout);
   }
-  return data.items.map((item) => ({
-    title: item.title,
-    description: stripHtml(item.description),
-    source: feed.name,
-    publishedAt: item.pubDate,
-    image: item.thumbnail || item.enclosure?.link || extractImageFromHtml(item.description),
-    url: item.link
-  }));
 }
 
 async function fetchLiveCategory(category) {
@@ -188,10 +216,7 @@ async function fetchLiveCategory(category) {
   if (!feedList) return null;
 
   const results = await Promise.allSettled(feedList.map(fetchOneFeed));
-  const articles = results
-    .filter((r) => r.status === "fulfilled")
-    .flatMap((r) => r.value);
-
+  const articles = results.filter((r) => r.status === "fulfilled").flatMap((r) => r.value);
   if (articles.length === 0) return null;
 
   articles.sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt));
@@ -199,22 +224,22 @@ async function fetchLiveCategory(category) {
 }
 
 async function loadNews() {
-  showLoading();
+  const myToken = ++requestToken;
+
+  // Affichage immédiat (démo ou dernier résultat) pendant que les flux réels se chargent en arrière-plan
+  renderNews(demoNews[currentCategory] || []);
+
+  if (!CONFIG.useLiveFeeds || !CONFIG.feeds[currentCategory]) return;
+
   try {
-    let articles = null;
-
-    if (CONFIG.useLiveFeeds && CONFIG.feeds[currentCategory]) {
-      articles = await fetchLiveCategory(currentCategory);
+    const liveArticles = await fetchLiveCategory(currentCategory);
+    if (myToken !== requestToken) return; // l'utilisateur a changé d'onglet entre-temps
+    if (liveArticles && liveArticles.length > 0) {
+      renderNews(liveArticles);
     }
-
-    if (!articles || articles.length === 0) {
-      articles = demoNews[currentCategory] || [];
-    }
-
-    renderNews(articles);
   } catch (error) {
     console.error(error);
-    renderNews(demoNews[currentCategory] || []);
+    // on garde la démo déjà affichée
   }
 }
 
