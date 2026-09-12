@@ -1,16 +1,43 @@
 const CONFIG = {
   useLiveFeeds: true,
-  feedTimeoutMs: 6000,
+  feedTimeoutMs: 8000,
   feeds: {
+    // عاجل + تشاد
     breaking: [
       { name: "Tchadinfos", url: "https://tchadinfos.com/feed/" },
-      { name: "Alwihda Info", url: "https://www.alwihdainfo.com/xml/rss.xml" },
-      { name: "Journal du Tchad", url: "https://www.journaldutchad.com/feed/" }
+      { name: "Alwihda Info", url: "https://www.alwihdainfo.com/xml/syndication.rss" },
+      { name: "Journal du Tchad", url: "https://www.journaldutchad.com/feed/" },
+      { name: "Africanews", url: "https://www.africanews.com/feed/" }
     ],
     chad: [
       { name: "Tchadinfos", url: "https://tchadinfos.com/feed/" },
-      { name: "Alwihda Info", url: "https://www.alwihdainfo.com/xml/rss.xml" },
-      { name: "Journal du Tchad", url: "https://www.journaldutchad.com/feed/" }
+      { name: "Alwihda Info", url: "https://www.alwihdainfo.com/xml/syndication.rss" },
+      { name: "Journal du Tchad", url: "https://www.journaldutchad.com/feed/" },
+      { name: "Africanews", url: "https://www.africanews.com/feed/" }
+    ],
+    // أفريقيا
+    africa: [
+      { name: "Africanews", url: "https://www.africanews.com/feed/" },
+      { name: "BBC Afrique", url: "https://feeds.bbci.co.uk/afrique/rss.xml" },
+      { name: "AllAfrica", url: "https://allafrica.com/tools/headlines/rdf/africa/headlines.rdf" },
+      { name: "France 24 Afrique", url: "https://www.france24.com/fr/afrique/rss" },
+      { name: "Al Jazeera", url: "https://www.aljazeera.com/xml/rss/all.xml" }
+    ],
+    // العالم
+    world: [
+      { name: "BBC World", url: "https://feeds.bbci.co.uk/news/world/rss.xml" },
+      { name: "Al Jazeera", url: "https://www.aljazeera.com/xml/rss/all.xml" },
+      { name: "France 24", url: "https://www.france24.com/fr/rss" },
+      { name: "Reuters", url: "https://www.reutersagency.com/feed/?taxonomy=best-topics&post_type=best" },
+      { name: "BBC News", url: "https://feeds.bbci.co.uk/news/rss.xml" }
+    ],
+    // الرياضة
+    sports: [
+      { name: "BBC Sport", url: "https://feeds.bbci.co.uk/sport/rss.xml" },
+      { name: "Africanews Sport", url: "https://www.africanews.com/feed/rss?theme=sport" },
+      { name: "France 24 Sport", url: "https://www.france24.com/fr/sports/rss" },
+      { name: "Al Jazeera Sport", url: "https://www.aljazeera.com/xml/rss/all.xml" },
+      { name: "Goal", url: "https://www.goal.com/feeds/en/news" }
     ]
   },
   rss2jsonEndpoint: "https://api.rss2json.com/v1/api.json?rss_url="
@@ -46,7 +73,6 @@ const translations = {
   }
 };
 
-// Données de démo traduites dans les 3 langues (utilisées seulement si les flux réels échouent)
 const demoNews = {
   breaking: [{
     title: { ar: "آخر الأخبار العاجلة من تشاد وأفريقيا", fr: "Dernières actualités urgentes du Tchad et d'Afrique", en: "Latest breaking news from Chad and Africa" },
@@ -82,7 +108,7 @@ const demoNews = {
 
 let currentLanguage = localStorage.getItem("language") || "ar";
 let currentCategory = "breaking";
-let requestToken = 0; // pour ignorer les réponses obsolètes si l'utilisateur change vite d'onglet
+let requestToken = 0;
 
 const appNameElement = document.getElementById("appName");
 const appDescriptionElement = document.getElementById("appDescription");
@@ -122,8 +148,11 @@ function formatDate(dateValue) {
 function escapeHtml(value) {
   if (!value) return "";
   return String(value)
-    .replaceAll("&", "&amp;").replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#039;");
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
 }
 
 function stripHtml(html) {
@@ -134,12 +163,11 @@ function stripHtml(html) {
 
 function extractImageFromHtml(html) {
   if (!html) return null;
-  const match = html.match(/<img[^>]+src="([^">]+)"/i);
+  const match = html.match(/<img[^>]+src=["']([^"'>]+)["']/i);
   return match ? match[1] : null;
 }
 
 function pickLang(value) {
-  // gère les champs multilingues des données de démo (objet {ar,fr,en}) et les chaînes normales des flux réels
   if (value && typeof value === "object") {
     return value[currentLanguage] || value.fr || value.ar || value.en || "";
   }
@@ -200,12 +228,15 @@ async function fetchOneFeed(feed) {
     }
     return data.items.map((item) => ({
       title: item.title,
-      description: stripHtml(item.description),
+      description: stripHtml(item.description || item.content || ""),
       source: feed.name,
       publishedAt: item.pubDate,
-      image: item.thumbnail || item.enclosure?.link || extractImageFromHtml(item.description),
+      image: item.thumbnail || item.enclosure?.link || extractImageFromHtml(item.description || item.content),
       url: item.link
     }));
+  } catch (err) {
+    console.warn("Feed error:", feed.name, err.message);
+    return [];
   } finally {
     clearTimeout(timeout);
   }
@@ -213,33 +244,46 @@ async function fetchOneFeed(feed) {
 
 async function fetchLiveCategory(category) {
   const feedList = CONFIG.feeds[category];
-  if (!feedList) return null;
+  if (!feedList || feedList.length === 0) return null;
 
   const results = await Promise.allSettled(feedList.map(fetchOneFeed));
-  const articles = results.filter((r) => r.status === "fulfilled").flatMap((r) => r.value);
+  const articles = results
+    .filter((r) => r.status === "fulfilled")
+    .flatMap((r) => r.value);
+
   if (articles.length === 0) return null;
 
-  articles.sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt));
-  return articles.slice(0, 24);
+  // إزالة التكرار حسب العنوان
+  const seen = new Set();
+  const unique = articles.filter((a) => {
+    const key = (a.title || "").toLowerCase().trim();
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  unique.sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt));
+  return unique.slice(0, 30);
 }
 
 async function loadNews() {
   const myToken = ++requestToken;
+  const text = getCurrentText();
 
-  // Affichage immédiat (démo ou dernier résultat) pendant que les flux réels se chargent en arrière-plan
+  showMessage(text.loading);
+  // عرض بيانات تجريبية فوراً
   renderNews(demoNews[currentCategory] || []);
 
   if (!CONFIG.useLiveFeeds || !CONFIG.feeds[currentCategory]) return;
 
   try {
     const liveArticles = await fetchLiveCategory(currentCategory);
-    if (myToken !== requestToken) return; // l'utilisateur a changé d'onglet entre-temps
+    if (myToken !== requestToken) return;
     if (liveArticles && liveArticles.length > 0) {
       renderNews(liveArticles);
     }
   } catch (error) {
     console.error(error);
-    // on garde la démo déjà affichée
   }
 }
 
@@ -272,7 +316,7 @@ loadNews();
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker.register("./sw.js")
-      .then(() => console.log("Service Worker registered successfully"))
-      .catch((error) => console.error("Service Worker registration failed:", error));
+      .then(() => console.log("Service Worker registered"))
+      .catch((err) => console.error("SW registration failed:", err));
   });
 }
