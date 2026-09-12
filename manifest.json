@@ -1,24 +1,39 @@
 {
   "name": "Labarkouh News",
-  "short\_name": "Labarkouh News",
-  "description": "أخبار تشاد وأفريقيا والعالم والرياضة",
-  "start\_url": "./index.html",
+  "short_name": "Labarkouh",
+  "description": "أخبار تشاد وأفريقيا والعالم والرياضة - News from Chad, Africa, the world and sports",
+  "start_url": "./index.html",
   "display": "standalone",
-  "background\_color": "#f1f5f9",
-  "theme\_color": "#0f172a",
-  "orientation": "portrait",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "orientation": "any",
   "lang": "ar",
   "dir": "rtl",
+  "categories": ["news", "magazines"],
   "icons": [
     {
       "src": "icon-192.png",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
     },
     {
       "src": "icon-512.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }
