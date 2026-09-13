@@ -5,29 +5,29 @@ const CONFIG = {
   cacheTTL: 7 * 60 * 1000,
   similarityThreshold: 0.52,
   feeds: {
+    // للشريط العاجل فقط (لا يظهر كزر)
     breaking: [
       { name: "BBC Arabic", url: "https://feeds.bbci.co.uk/arabic/rss.xml", lang: "ar" },
       { name: "Tchadinfos", url: "https://tchadinfos.com/feed/", lang: "fr" },
       { name: "Alwihda Info", url: "https://www.alwihdainfo.com/xml/syndication.rss", lang: "fr" },
-      { name: "Journal du Tchad", url: "https://www.journaldutchad.com/feed/", lang: "fr" },
       { name: "RFI Afrique", url: "https://www.rfi.fr/fr/afrique/rss", lang: "fr" }
     ],
+    // أخبار تشاد فقط
     chad: [
       { name: "Tchadinfos", url: "https://tchadinfos.com/feed/", lang: "fr" },
       { name: "Alwihda Info", url: "https://www.alwihdainfo.com/xml/syndication.rss", lang: "fr" },
       { name: "Journal du Tchad", url: "https://www.journaldutchad.com/feed/", lang: "fr" },
-      { name: "RFI Afrique", url: "https://www.rfi.fr/fr/afrique/rss", lang: "fr" },
       { name: "Tchadone", url: "https://tchadone.com/post/author/tchadone/feed/", lang: "fr" }
     ],
+    // أفريقيا فقط (بدون مصادر عالمية عامة)
     africa: [
-      { name: "BBC Arabic", url: "https://feeds.bbci.co.uk/arabic/rss.xml", lang: "ar" },
+      { name: "BBC Afrique", url: "https://feeds.bbci.co.uk/afrique/rss.xml", lang: "fr" },
       { name: "BBC Africa", url: "https://feeds.bbci.co.uk/news/world/africa/rss.xml", lang: "en" },
       { name: "Africanews", url: "https://www.africanews.com/feed/", lang: "en" },
-      { name: "BBC Afrique", url: "https://feeds.bbci.co.uk/afrique/rss.xml", lang: "fr" },
       { name: "RFI Afrique", url: "https://www.rfi.fr/fr/afrique/rss", lang: "fr" },
-      { name: "France 24 Afrique", url: "https://www.france24.com/fr/afrique/rss", lang: "fr" },
-      { name: "Al Jazeera", url: "https://www.aljazeera.com/xml/rss/all.xml", lang: "en" }
+      { name: "France 24 Afrique", url: "https://www.france24.com/fr/afrique/rss", lang: "fr" }
     ],
+    // العالم بدون أفريقيا
     world: [
       { name: "BBC Arabic", url: "https://feeds.bbci.co.uk/arabic/rss.xml", lang: "ar" },
       { name: "BBC World", url: "https://feeds.bbci.co.uk/news/world/rss.xml", lang: "en" },
@@ -37,8 +37,7 @@ const CONFIG = {
     ],
     sports: [
       { name: "BBC Sport", url: "https://feeds.bbci.co.uk/sport/rss.xml", lang: "en" },
-      { name: "France 24 Sport", url: "https://www.france24.com/fr/sports/rss", lang: "fr" },
-      { name: "Africanews", url: "https://www.africanews.com/feed/", lang: "en" }
+      { name: "France 24 Sport", url: "https://www.france24.com/fr/sports/rss", lang: "fr" }
     ]
   },
   proxies: [
@@ -138,7 +137,7 @@ const demoNews = {
 };
 
 let currentLanguage = localStorage.getItem("language") || "ar";
-let currentCategory = "breaking";
+let currentCategory = "chad";
 let requestToken = 0;
 let tickerArticles = [];
 let isLoading = false;
@@ -434,6 +433,7 @@ async function fetchViaProxy(feed, proxy) {
 
     if (!items || items.length === 0) throw new Error("No items");
 
+    // FIXED: return every article from the feed
     return items.map((it) => ({
       title: it.title,
       description: it.description,
@@ -459,6 +459,17 @@ async function fetchOneFeed(feed) {
   return [];
 }
 
+function isAfricaRelated(title) {
+  const t = (title || "").toLowerCase();
+  const keywords = [
+    "africa", "afrique", "أفريقيا", "افريقيا", "kenya", "nigeria", "senegal",
+    "cameroon", "cameroun", "sudan", "ethiopia", "ghana", "uganda", "tanzania",
+    "mali", "niger", "tchad", "chad", "congo", "rwanda", "zimbabwe", "nairobi",
+    "lagos", "dakar", "addis", "khartoum", "african"
+  ];
+  return keywords.some((k) => t.includes(k));
+}
+
 async function fetchLiveCategory(category) {
   const feedList = CONFIG.feeds[category];
   if (!feedList || feedList.length === 0) return null;
@@ -467,15 +478,21 @@ async function fetchLiveCategory(category) {
     feedList.map((feed) => fetchOneFeed(feed))
   );
 
-  const articles = results
+  let articles = results
     .filter((r) => r.status === "fulfilled")
     .flatMap((r) => r.value || []);
 
   if (articles.length === 0) return null;
 
+  // في قسم العالم: استبعد الأخبار التي تبدو أفريقية بحتة
+  if (category === "world") {
+    articles = articles.filter((a) => !isAfricaRelated(a.title));
+  }
+
+  // ترتيب قوي حسب اللغة ثم التاريخ
   articles.sort((a, b) => {
-    const aMatch = a.lang === currentLanguage ? 1 : 0;
-    const bMatch = b.lang === currentLanguage ? 1 : 0;
+    const aMatch = a.lang === currentLanguage ? 2 : (a.lang === "ar" && currentLanguage === "ar" ? 2 : 0);
+    const bMatch = b.lang === currentLanguage ? 2 : (b.lang === "ar" && currentLanguage === "ar" ? 2 : 0);
     if (aMatch !== bMatch) return bMatch - aMatch;
     return new Date(b.publishedAt) - new Date(a.publishedAt);
   });
@@ -531,6 +548,7 @@ async function enableNotifications() {
     notificationsEnabled = true;
     localStorage.setItem("labarkouh_notify", "1");
     updateNotifyButtonUI();
+    // Test notification
     showLocalNotification(
       getCurrentText().notifyEnabled,
       currentLanguage === "ar"
@@ -585,9 +603,11 @@ function showLocalNotification(title, body, url) {
     data: { url: url || window.location.href }
   };
 
+  // Prefer Service Worker notification (works even if tab is in background)
   if (navigator.serviceWorker && navigator.serviceWorker.controller) {
     navigator.serviceWorker.ready.then((reg) => {
       reg.showNotification(title, options).catch(() => {
+        // fallback
         try { new Notification(title, options); } catch (_) {}
       });
     });
@@ -606,6 +626,7 @@ function maybeNotifyNewBreaking(articles) {
   const title = (top.title || "").trim();
   if (!title || title === lastNotifiedTitle) return;
 
+  // Only notify if this looks newer than what we last saw
   lastNotifiedTitle = title;
   localStorage.setItem("labarkouh_last_notify", title);
 
@@ -714,6 +735,7 @@ categoryButtons.forEach((button) => {
 if (notifyButtonElement) {
   notifyButtonElement.addEventListener("click", () => {
     if (Notification.permission === "granted" && notificationsEnabled) {
+      // Toggle off
       notificationsEnabled = false;
       localStorage.setItem("labarkouh_notify", "0");
       updateNotifyButtonUI();
@@ -730,6 +752,7 @@ loadNews(false);
 loadTicker();
 setInterval(loadTicker, 3 * 60 * 1000);
 
+// Restore notification preference if already granted
 if (isNotificationSupported() && Notification.permission === "granted" && localStorage.getItem("labarkouh_notify") === "1") {
   notificationsEnabled = true;
 }
@@ -739,8 +762,9 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker.register("./sw.js")
       .then((reg) => {
+        // Listen for messages from SW if needed later
         console.log("SW ready", reg.scope);
       })
       .catch(() => {});
   });
-} 
+}
