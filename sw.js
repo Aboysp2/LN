@@ -90,4 +90,6 @@ self.addEventListener("notificationclick", (event) => {
   );
 });
 
-self.addEventListener("notificationclose", () => {});
+self.addEventListener("notificationclose", () => {
+  // optional analytics
+});
