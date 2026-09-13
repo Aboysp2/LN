@@ -1,8 +1,8 @@
 const CONFIG = {
   useLiveFeeds: true,
-  feedTimeoutMs: 4500,          // أسرع timeout
+  feedTimeoutMs: 4500,
   maxArticles: 24,
-  cacheTTL: 8 * 60 * 1000,      // كاش 8 دقائق
+  cacheTTL: 8 * 60 * 1000,
   feeds: {
     breaking: [
       { name: "Tchadinfos", url: "https://tchadinfos.com/feed/" },
@@ -32,10 +32,9 @@ const CONFIG = {
       { name: "Africanews", url: "https://www.africanews.com/feed/" }
     ]
   },
-  // عدة بروكسيات لزيادة السرعة والموثوقية
   proxies: [
-    "https://api.rss2json.com/v1/api.json?rss_url=",
-    "https://api.allorigins.win/get?url="
+    { type: "rss2json", url: "https://api.rss2json.com/v1/api.json?rss_url=" },
+    { type: "allorigins", url: "https://api.allorigins.win/raw?url=" }
   ]
 };
 
@@ -115,7 +114,6 @@ const newsContainerElement = document.getElementById("newsContainer");
 const categoryButtons = document.querySelectorAll(".category-button");
 const currentYearElement = document.getElementById("currentYear");
 
-/* ===================== Cache helpers (سريع جداً) ===================== */
 function getCacheKey(category) {
   return `labarkouh_${category}`;
 }
@@ -138,12 +136,9 @@ function setCachedArticles(category, articles) {
       ts: Date.now(),
       articles: articles.slice(0, CONFIG.maxArticles)
     }));
-  } catch (e) {
-    // تجاهل إذا كان localStorage ممتلئاً
-  }
+  } catch (e) {}
 }
 
-/* ===================== UI ===================== */
 function getCurrentText() {
   return translations[currentLanguage];
 }
@@ -199,6 +194,10 @@ function pickLang(value) {
   return value || "";
 }
 
+function safeUrl(url) {
+  return /^https?:\/\//i.test(url) ? url : "#";
+}
+
 function showMessage(message) {
   newsContainerElement.innerHTML = `<div class="status-message">${message}</div>`;
 }
@@ -220,7 +219,6 @@ function renderNews(articles) {
     showMessage(text.noNews);
     return;
   }
-  // استخدم DocumentFragment لسرعة أكبر
   const fragment = document.createDocumentFragment();
   const temp = document.createElement("div");
 
@@ -237,7 +235,7 @@ function renderNews(articles) {
           </div>
           <h3 class="news-title">${escapeHtml(article.title)}</h3>
           <p class="news-description">${escapeHtml(article.description)}</p>
-          <a class="read-link" href="${escapeHtml(article.url)}" target="_blank" rel="noopener noreferrer">${text.read}</a>
+          <a class="read-link" href="${escapeHtml(safeUrl(article.url))}" target="_blank" rel="noopener noreferrer">${text.read}</a>
         </div>
       </article>
     `;
@@ -250,43 +248,132 @@ function renderNews(articles) {
   newsContainerElement.appendChild(fragment);
 }
 
-/* ===================== Fetch (محسّن للسرعة) ===================== */
-async function fetchOneFeed(feed) {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), CONFIG.feedTimeoutMs);
+// ---------- محرك تحليل RSS/Atom XML (لخط allorigins) ----------
 
-  try {
-    // نستخدم rss2json أولاً (الأسرع والأكثر استقراراً)
-    const apiUrl = CONFIG.proxies[0] + encodeURIComponent(feed.url);
-    const response = await fetch(apiUrl, { signal: controller.signal });
-    if (!response.ok) throw new Error("HTTP " + response.status);
+function localName(el) {
+  return el.localName || el.tagName;
+}
 
-    const data = await response.json();
-    if (data.status !== "ok" || !Array.isArray(data.items)) {
-      throw new Error("Parse failed");
-    }
-
-    return data.items.slice(0, 12).map((item) => ({
-      title: item.title,
-      description: stripHtml(item.description || item.content || ""),
-      source: feed.name,
-      publishedAt: item.pubDate,
-      image: item.thumbnail || item.enclosure?.link || extractImageFromHtml(item.description || item.content),
-      url: item.link
-    }));
-  } catch (err) {
-    console.warn("Feed skip:", feed.name, err.message);
-    return [];
-  } finally {
-    clearTimeout(timeout);
+function findFirstTag(node, names) {
+  const all = node.getElementsByTagName("*");
+  for (let i = 0; i < all.length; i++) {
+    if (names.includes(localName(all[i]))) return all[i];
   }
+  return null;
+}
+
+function findAllTags(node, name) {
+  const all = node.getElementsByTagName("*");
+  const out = [];
+  for (let i = 0; i < all.length; i++) {
+    if (localName(all[i]) === name) out.push(all[i]);
+  }
+  return out;
+}
+
+function parseRssXml(xmlText) {
+  try {
+    const doc = new DOMParser().parseFromString(xmlText, "text/xml");
+    if (doc.querySelector("parsererror")) return [];
+
+    const entryNodes = Array.from(doc.getElementsByTagName("*")).filter(
+      (el) => localName(el) === "item" || localName(el) === "entry"
+    );
+
+    return entryNodes.map((node) => {
+      const titleEl = findFirstTag(node, ["title"]);
+      const title = titleEl ? titleEl.textContent.trim() : "";
+
+      let link = "";
+      for (const el of findAllTags(node, "link")) {
+        const href = el.getAttribute("href");
+        if (href) { link = href; break; }
+        if (el.textContent && el.textContent.trim()) { link = el.textContent.trim(); break; }
+      }
+
+      const descEl = findFirstTag(node, ["encoded", "description", "summary", "content"]);
+      const descriptionRaw = descEl ? descEl.textContent : "";
+
+      const dateEl = findFirstTag(node, ["pubDate", "published", "updated", "date"]);
+      const pubDate = dateEl ? dateEl.textContent.trim() : "";
+
+      let image = extractImageFromHtml(descriptionRaw);
+      if (!image) {
+        const thumbEl = findFirstTag(node, ["thumbnail"]);
+        if (thumbEl) image = thumbEl.getAttribute("url");
+      }
+      if (!image) {
+        const enclosure = findAllTags(node, "enclosure")
+          .find((el) => (el.getAttribute("type") || "").startsWith("image"));
+        if (enclosure) image = enclosure.getAttribute("url");
+      }
+
+      return {
+        title,
+        description: stripHtml(descriptionRaw),
+        pubDate,
+        image,
+        link
+      };
+    });
+  } catch (e) {
+    return [];
+  }
+}
+
+// ---------- جلب الأخبار ----------
+
+async function fetchOneFeed(feed) {
+  for (const proxy of CONFIG.proxies) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), CONFIG.feedTimeoutMs);
+    try {
+      const apiUrl = proxy.url + encodeURIComponent(feed.url);
+      const response = await fetch(apiUrl, { signal: controller.signal });
+      if (!response.ok) throw new Error("HTTP " + response.status);
+
+      let items = [];
+
+      if (proxy.type === "rss2json") {
+        const data = await response.json();
+        if (data.status !== "ok" || !Array.isArray(data.items)) {
+          throw new Error("Parse failed");
+        }
+        items = data.items.map((item) => ({
+          title: item.title,
+          description: stripHtml(item.description || item.content || ""),
+          pubDate: item.pubDate,
+          image: item.thumbnail || item.enclosure?.link || extractImageFromHtml(item.description || item.content),
+          link: item.link
+        }));
+      } else if (proxy.type === "allorigins") {
+        const xmlText = await response.text();
+        items = parseRssXml(xmlText);
+      }
+
+      if (!items || items.length === 0) throw new Error("No items");
+
+      return items.slice(0, 12).map((item) => ({
+        title: item.title,
+        description: item.description,
+        source: feed.name,
+        publishedAt: item.pubDate,
+        image: item.image,
+        url: item.link
+      }));
+    } catch (err) {
+      console.warn("Feed skip:", feed.name, proxy.type, err.message);
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+  return [];
 }
 
 async function fetchLiveCategory(category) {
   const feedList = CONFIG.feeds[category];
   if (!feedList || feedList.length === 0) return null;
 
-  // جلب كل المصادر بالتوازي مع مهلة قصيرة
   const results = await Promise.allSettled(
     feedList.map(feed => fetchOneFeed(feed))
   );
@@ -297,7 +384,6 @@ async function fetchLiveCategory(category) {
 
   if (articles.length === 0) return null;
 
-  // إزالة التكرار
   const seen = new Set();
   const unique = [];
   for (const a of articles) {
@@ -311,12 +397,10 @@ async function fetchLiveCategory(category) {
   return unique.slice(0, CONFIG.maxArticles);
 }
 
-/* ===================== Main load (الأسرع) ===================== */
 async function loadNews(forceRefresh = false) {
   const myToken = ++requestToken;
   const text = getCurrentText();
 
-  // 1. عرض الكاش فوراً إن وجد (أسرع تجربة مستخدم)
   if (!forceRefresh) {
     const cached = getCachedArticles(currentCategory);
     if (cached && cached.length > 0) {
@@ -333,7 +417,7 @@ async function loadNews(forceRefresh = false) {
 
   try {
     const liveArticles = await fetchLiveCategory(currentCategory);
-    if (myToken !== requestToken) return; // تم تغيير الفئة
+    if (myToken !== requestToken) return;
 
     if (liveArticles && liveArticles.length > 0) {
       setCachedArticles(currentCategory, liveArticles);
@@ -357,11 +441,11 @@ languageSelectElement.addEventListener("change", (event) => {
   currentLanguage = event.target.value;
   localStorage.setItem("language", currentLanguage);
   updateInterface();
-  loadNews(false);
+  const cached = getCachedArticles(currentCategory);
+  renderNews(cached && cached.length ? cached : demoNews[currentCategory] || []);
 });
 
 refreshButtonElement.addEventListener("click", () => {
-  // مسح الكاش للفئة الحالية ثم إعادة التحميل
   localStorage.removeItem(getCacheKey(currentCategory));
   loadNews(true);
 });
