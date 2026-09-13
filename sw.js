@@ -1,77 +1,40 @@
-const CACHE_NAME = "labarkouh-news-v6";
-
-const STATIC_FILES = [
+const CACHE_NAME = "labarkouh-v2";
+const ASSETS = [
   "./",
   "./index.html",
-  "./script.js",
-  "./manifest.json",
-  "./icon-192.png",
-  "./icon-512.png"
+  "./style.css",
+  "./app.js",
+  "./manifest.json"
 ];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(STATIC_FILES))
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS)).then(() => self.skipWaiting())
   );
-  self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.keys().then((cacheNames) =>
-      Promise.all(
-        cacheNames
-          .filter((name) => name !== CACHE_NAME)
-          .map((name) => caches.delete(name))
-      )
-    )
+    caches.keys().then((keys) =>
+      Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
+    ).then(() => self.clients.claim())
   );
-  self.clients.claim();
 });
 
 self.addEventListener("fetch", (event) => {
-  if (event.request.method !== "GET") return;
-
-  const url = event.request.url;
-
-  // Stale-while-revalidate للأخبار: يعرض الكاش فوراً ويحدّثه بالخلفية
-  if (url.includes("rss2json.com") || url.includes("allorigins.win") || url.includes("api.")) {
+  const url = new URL(event.request.url);
+  // Only cache same-origin static assets; never cache API/proxy responses
+  if (url.origin === self.location.origin) {
     event.respondWith(
-      caches.open(CACHE_NAME).then(async (cache) => {
-        const cached = await cache.match(event.request);
-        const fetchPromise = fetch(event.request)
-          .then((response) => {
-            if (response && response.status === 200) {
-              cache.put(event.request, response.clone());
-            }
-            return response;
-          })
-          .catch(() => cached);
-        return cached || fetchPromise;
+      caches.match(event.request).then((cached) => {
+        return cached || fetch(event.request).then((res) => {
+          if (res.ok && event.request.method === "GET") {
+            const clone = res.clone();
+            caches.open(CACHE_NAME).then((c) => c.put(event.request, clone));
+          }
+          return res;
+        }).catch(() => cached);
       })
     );
-    return;
   }
-
-  // Cache-first للملفات الثابتة
-  event.respondWith(
-    caches.match(event.request).then((cached) => {
-      if (cached) return cached;
-
-      return fetch(event.request)
-        .then((response) => {
-          if (response && response.status === 200 && response.type === "basic") {
-            const clone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
-          }
-          return response;
-        })
-        .catch(() =>
-          new Response("لا يوجد اتصال بالإنترنت", {
-            status: 503,
-            headers: { "Content-Type": "text/plain; charset=utf-8" }
-          })
-        );
-    })
-  );
 });
