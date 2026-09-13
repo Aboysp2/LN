@@ -3,6 +3,7 @@ const CONFIG = {
   feedTimeoutMs: 3500,
   maxArticles: 24,
   cacheTTL: 8 * 60 * 1000,
+  similarityThreshold: 0.55,
   feeds: {
     breaking: [
       { name: "BBC Arabic", url: "https://feeds.bbci.co.uk/arabic/rss.xml", lang: "ar" },
@@ -14,7 +15,8 @@ const CONFIG = {
       { name: "Tchadinfos", url: "https://tchadinfos.com/feed/", lang: "fr" },
       { name: "Alwihda Info", url: "https://www.alwihdainfo.com/xml/syndication.rss", lang: "fr" },
       { name: "Journal du Tchad", url: "https://www.journaldutchad.com/feed/", lang: "fr" },
-      { name: "RFI Afrique", url: "https://www.rfi.fr/fr/afrique/rss", lang: "fr" }
+      { name: "RFI Afrique", url: "https://www.rfi.fr/fr/afrique/rss", lang: "fr" },
+      { name: "Tchadone", url: "https://tchadone.com/post/author/tchadone/feed/", lang: "fr" }
     ],
     africa: [
       { name: "BBC Arabic", url: "https://feeds.bbci.co.uk/arabic/rss.xml", lang: "ar" },
@@ -100,7 +102,7 @@ const demoNews = {
     url: "https://news.google.com"
   }],
   sports: [{
-    title: { ar: "آخر أخبار الرياضة", fr: "Dernières actualités سبورتية", en: "Latest sports news" },
+    title: { ar: "آخر أخبار الرياضة", fr: "Dernières actualités sportives", en: "Latest sports news" },
     description: { ar: "أهم نتائج ومباريات كرة القدم والرياضات العالمية.", fr: "Les principaux résultats et matchs de football et de sports mondiaux.", en: "Top results and matches in football and world sports." },
     source: "Sports News", publishedAt: new Date().toISOString(), image: PLACEHOLDER_IMAGE,
     url: "https://www.google.com/search?q=sports+latest+news"
@@ -110,6 +112,7 @@ const demoNews = {
 let currentLanguage = localStorage.getItem("language") || "ar";
 let currentCategory = "breaking";
 let requestToken = 0;
+let tickerArticles = [];
 
 const appNameElement = document.getElementById("appName");
 const appDescriptionElement = document.getElementById("appDescription");
@@ -119,6 +122,9 @@ const refreshButtonElement = document.getElementById("refreshButton");
 const newsContainerElement = document.getElementById("newsContainer");
 const categoryButtons = document.querySelectorAll(".category-button");
 const currentYearElement = document.getElementById("currentYear");
+const tickerWrapElement = document.getElementById("tickerWrap");
+const tickerTrackElement = document.getElementById("tickerTrack");
+const tickerLabelElement = document.getElementById("tickerLabel");
 
 function getCacheKey(category) {
   return `labarkouh_${category}`;
@@ -161,6 +167,7 @@ function updateInterface() {
     button.textContent = text.categories[button.dataset.category];
   });
   languageSelectElement.value = currentLanguage;
+  tickerLabelElement.textContent = text.categories.breaking;
 }
 
 function formatDate(dateValue) {
@@ -202,6 +209,25 @@ function pickLang(value) {
 
 function safeUrl(url) {
   return /^https?:\/\//i.test(url) ? url : "#";
+}
+
+// ---------- كشف الأخبار المتشابهة (مو بس التطابق الحرفي) ----------
+
+function normalizeForCompare(text) {
+  return (text || "")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function titleSimilarity(a, b) {
+  const wordsA = new Set(normalizeForCompare(a).split(" ").filter((w) => w.length > 2));
+  const wordsB = new Set(normalizeForCompare(b).split(" ").filter((w) => w.length > 2));
+  if (wordsA.size === 0 || wordsB.size === 0) return 0;
+  let common = 0;
+  wordsA.forEach((w) => { if (wordsB.has(w)) common++; });
+  return common / Math.min(wordsA.size, wordsB.size);
 }
 
 function showMessage(message) {
@@ -254,6 +280,47 @@ function renderNews(articles) {
   }
   newsContainerElement.innerHTML = "";
   newsContainerElement.appendChild(fragment);
+}
+
+// ---------- الشريط المتحرك ----------
+
+function renderTicker() {
+  if (!tickerArticles || tickerArticles.length === 0) {
+    tickerWrapElement.style.display = "none";
+    return;
+  }
+  tickerWrapElement.style.display = "flex";
+  const itemsHtml = tickerArticles.map((rawArticle) => {
+    const article = normalizeArticle(rawArticle);
+    return `<a class="ticker-item" href="${escapeHtml(safeUrl(article.url))}" target="_blank" rel="noopener noreferrer">${escapeHtml(article.title)}</a>`;
+  }).join(`<span class="ticker-sep">•</span>`);
+
+  tickerTrackElement.innerHTML = itemsHtml + `<span class="ticker-sep">•</span>` + itemsHtml;
+
+  requestAnimationFrame(() => {
+    const width = tickerTrackElement.scrollWidth / 2;
+    const speed = 60; // px/ثانية تقريباً
+    const duration = Math.max(15, width / speed);
+    tickerTrackElement.style.animationDuration = duration + "s";
+  });
+}
+
+async function loadTicker() {
+  const cached = getCachedArticles("breaking");
+  if (cached && cached.length) {
+    tickerArticles = cached;
+    renderTicker();
+  }
+  try {
+    const live = await fetchLiveCategory("breaking");
+    if (live && live.length) {
+      tickerArticles = live;
+      setCachedArticles("breaking", live);
+      renderTicker();
+    }
+  } catch (e) {
+    console.warn("Ticker load failed", e);
+  }
 }
 
 // ---------- محرك تحليل RSS/Atom XML (لخط allorigins) ----------
@@ -329,7 +396,7 @@ function parseRssXml(xmlText) {
   }
 }
 
-// ---------- جلب الأخبار (سباق بروكسيات + خبر واحد فقط لكل مصدر) ----------
+// ---------- جلب الأخبار ----------
 
 async function fetchViaProxy(feed, proxy) {
   const controller = new AbortController();
@@ -357,7 +424,6 @@ async function fetchViaProxy(feed, proxy) {
 
     if (!items || items.length === 0) throw new Error("No items");
 
-    // خبر واحد فقط (الأحدث) من كل مصدر — يمنع تكرار نفس المصدر بعدة أخبار
     const latest = items[0];
     return [{
       title: latest.title,
@@ -396,22 +462,22 @@ async function fetchLiveCategory(category) {
 
   if (articles.length === 0) return null;
 
-  const seen = new Set();
-  const unique = [];
-  for (const a of articles) {
-    const key = (a.title || "").toLowerCase().trim().slice(0, 80);
-    if (!key || seen.has(key)) continue;
-    seen.add(key);
-    unique.push(a);
-  }
-
-  // الأولوية: نفس لغة الواجهة الحالية أولاً، ثم الأحدث تاريخاً
-  unique.sort((a, b) => {
+  // الأولوية: نفس لغة الواجهة أولاً، ثم الأحدث
+  articles.sort((a, b) => {
     const aMatch = a.lang === currentLanguage ? 1 : 0;
     const bMatch = b.lang === currentLanguage ? 1 : 0;
     if (aMatch !== bMatch) return bMatch - aMatch;
     return new Date(b.publishedAt) - new Date(a.publishedAt);
   });
+
+  // إزالة الأخبار المتشابهة القادمة من مصادر مختلفة (نفس الحدث)
+  const unique = [];
+  for (const article of articles) {
+    const isDuplicate = unique.some(
+      (kept) => titleSimilarity(kept.title, article.title) >= CONFIG.similarityThreshold
+    );
+    if (!isDuplicate) unique.push(article);
+  }
 
   return unique.slice(0, CONFIG.maxArticles);
 }
@@ -460,7 +526,8 @@ languageSelectElement.addEventListener("change", (event) => {
   currentLanguage = event.target.value;
   localStorage.setItem("language", currentLanguage);
   updateInterface();
-  loadNews(false); // لازم يعيد الترتيب حسب اللغة الجديدة
+  loadNews(false);
+  renderTicker();
 });
 
 refreshButtonElement.addEventListener("click", () => {
@@ -476,6 +543,8 @@ currentYearElement.textContent = new Date().getFullYear();
 
 updateInterface();
 loadNews(false);
+loadTicker();
+setInterval(loadTicker, CONFIG.cacheTTL);
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
