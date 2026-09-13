@@ -1,41 +1,22 @@
 {
-  "id": "./",
   "name": "Labarkouh News",
   "short_name": "Labarkouh",
-  "description": "أخبار تشاد وأفريقيا والعالم والرياضة - News from Chad, Africa, the world and sports",
+  "description": "أخبار تشاد وأفريقيا والعالم والرياضة",
   "start_url": "./index.html",
-  "scope": "./",
   "display": "standalone",
   "background_color": "#0f172a",
   "theme_color": "#0f172a",
   "orientation": "any",
   "lang": "ar",
   "dir": "rtl",
-  "categories": ["news", "magazines"],
   "icons": [
     {
-      "src": "icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "maskable"
-    },
-    {
-      "src": "icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "maskable"
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect fill='%23dc2626' width='100' height='100' rx='22'/%3E%3Ctext x='50' y='68' font-size='52' text-anchor='middle' fill='white' font-family='system-ui,Arial' font-weight='800'%3EL%3C/text%3E%3C/svg%3E",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
     }
-  ]
+  ],
+  "permissions": ["notifications"],
+  "categories": ["news", "magazines"]
 }
