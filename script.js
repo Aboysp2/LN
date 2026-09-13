@@ -1,15 +1,16 @@
 const CONFIG = {
   useLiveFeeds: true,
-  feedTimeoutMs: 3500,
-  maxArticles: 24,
-  cacheTTL: 8 * 60 * 1000,
-  similarityThreshold: 0.55,
+  feedTimeoutMs: 3200,
+  maxArticles: 28,
+  cacheTTL: 7 * 60 * 1000,
+  similarityThreshold: 0.52,
   feeds: {
     breaking: [
       { name: "BBC Arabic", url: "https://feeds.bbci.co.uk/arabic/rss.xml", lang: "ar" },
       { name: "Tchadinfos", url: "https://tchadinfos.com/feed/", lang: "fr" },
       { name: "Alwihda Info", url: "https://www.alwihdainfo.com/xml/syndication.rss", lang: "fr" },
-      { name: "Journal du Tchad", url: "https://www.journaldutchad.com/feed/", lang: "fr" }
+      { name: "Journal du Tchad", url: "https://www.journaldutchad.com/feed/", lang: "fr" },
+      { name: "RFI Afrique", url: "https://www.rfi.fr/fr/afrique/rss", lang: "fr" }
     ],
     chad: [
       { name: "Tchadinfos", url: "https://tchadinfos.com/feed/", lang: "fr" },
@@ -47,31 +48,58 @@ const CONFIG = {
 };
 
 const PLACEHOLDER_IMAGE =
-  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='220'%3E%3Crect width='100%25' height='100%25' fill='%23cbd5e1'/%3E%3Ctext x='50%25' y='50%25' font-family='Arial' font-size='16' fill='%2364748b' text-anchor='middle' dy='.3em'%3ELabarkouh News%3C/text%3E%3C/svg%3E";
+  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='220'%3E%3Crect width='100%25' height='100%25' fill='%23e2e8f0'/%3E%3Ctext x='50%25' y='50%25' font-family='system-ui' font-size='15' fill='%2394a3b8' text-anchor='middle' dy='.3em'%3ELabarkouh News%3C/text%3E%3C/svg%3E";
 
 const translations = {
   ar: {
-    direction: "rtl", name: "لاباركوه نيوز",
+    direction: "rtl",
+    name: "لاباركوه نيوز",
     description: "أخبار تشاد وأفريقيا والعالم والرياضة",
-    latest: "آخر الأخبار", loading: "جاري تحميل الأخبار...",
-    noNews: "لا توجد أخبار متاحة حاليًا.", error: "حدث خطأ أثناء تحميل الأخبار.",
-    refresh: "تحديث", read: "اقرأ الخبر",
+    latest: "آخر الأخبار",
+    loading: "جاري تحميل الأخبار...",
+    noNews: "لا توجد أخبار متاحة حاليًا.",
+    error: "حدث خطأ أثناء تحميل الأخبار.",
+    refresh: "تحديث",
+    read: "اقرأ الخبر",
+    notifyEnable: "تفعيل الإشعارات",
+    notifyEnabled: "الإشعارات مفعّلة",
+    notifyDenied: "الإشعارات محظورة",
+    notifyUnsupported: "غير مدعوم",
+    notifyNew: "خبر عاجل جديد",
     categories: { breaking: "عاجل", chad: "تشاد", africa: "أفريقيا", world: "العالم", sports: "الرياضة" }
   },
   fr: {
-    direction: "ltr", name: "Labarkouh News",
+    direction: "ltr",
+    name: "Labarkouh News",
     description: "Actualités du Tchad, d'Afrique, du monde et du sport",
-    latest: "Dernières nouvelles", loading: "Chargement des nouvelles...",
-    noNews: "Aucune nouvelle disponible.", error: "Une erreur est survenue.",
-    refresh: "Actualiser", read: "Lire l'article",
+    latest: "Dernières nouvelles",
+    loading: "Chargement des nouvelles...",
+    noNews: "Aucune nouvelle disponible.",
+    error: "Une erreur est survenue.",
+    refresh: "Actualiser",
+    read: "Lire l'article",
+    notifyEnable: "Activer les notifications",
+    notifyEnabled: "Notifications activées",
+    notifyDenied: "Notifications bloquées",
+    notifyUnsupported: "Non supporté",
+    notifyNew: "Nouvelle alerte",
     categories: { breaking: "Urgent", chad: "Tchad", africa: "Afrique", world: "Monde", sports: "Sports" }
   },
   en: {
-    direction: "ltr", name: "Labarkouh News",
+    direction: "ltr",
+    name: "Labarkouh News",
     description: "News from Chad, Africa, the world and sports",
-    latest: "Latest News", loading: "Loading news...",
-    noNews: "No news available at the moment.", error: "An error occurred while loading news.",
-    refresh: "Refresh", read: "Read article",
+    latest: "Latest News",
+    loading: "Loading news...",
+    noNews: "No news available at the moment.",
+    error: "An error occurred while loading news.",
+    refresh: "Refresh",
+    read: "Read article",
+    notifyEnable: "Enable notifications",
+    notifyEnabled: "Notifications on",
+    notifyDenied: "Notifications blocked",
+    notifyUnsupported: "Not supported",
+    notifyNew: "Breaking news",
     categories: { breaking: "Breaking", chad: "Chad", africa: "Africa", world: "World", sports: "Sports" }
   }
 };
@@ -113,6 +141,9 @@ let currentLanguage = localStorage.getItem("language") || "ar";
 let currentCategory = "breaking";
 let requestToken = 0;
 let tickerArticles = [];
+let isLoading = false;
+let lastNotifiedTitle = localStorage.getItem("labarkouh_last_notify") || "";
+let notificationsEnabled = localStorage.getItem("labarkouh_notify") === "1";
 
 const appNameElement = document.getElementById("appName");
 const appDescriptionElement = document.getElementById("appDescription");
@@ -125,9 +156,11 @@ const currentYearElement = document.getElementById("currentYear");
 const tickerWrapElement = document.getElementById("tickerWrap");
 const tickerTrackElement = document.getElementById("tickerTrack");
 const tickerLabelElement = document.getElementById("tickerLabel");
+const notifyButtonElement = document.getElementById("notifyButton");
+const notifyButtonTextElement = document.getElementById("notifyButtonText");
 
 function getCacheKey(category) {
-  return `labarkouh_${category}`;
+  return `labarkouh_v3_${category}`;
 }
 
 function getCachedArticles(category) {
@@ -148,11 +181,11 @@ function setCachedArticles(category, articles) {
       ts: Date.now(),
       articles: articles.slice(0, CONFIG.maxArticles)
     }));
-  } catch (e) {}
+  } catch (_) {}
 }
 
 function getCurrentText() {
-  return translations[currentLanguage];
+  return translations[currentLanguage] || translations.ar;
 }
 
 function updateInterface() {
@@ -168,18 +201,19 @@ function updateInterface() {
   });
   languageSelectElement.value = currentLanguage;
   tickerLabelElement.textContent = text.categories.breaking;
+  updateNotifyButtonUI();
 }
 
 function formatDate(dateValue) {
   if (!dateValue) return "";
   const locale = currentLanguage === "ar" ? "ar" : currentLanguage === "fr" ? "fr-FR" : "en-US";
   const parsed = new Date(dateValue);
-  if (isNaN(parsed)) return "";
+  if (isNaN(parsed.getTime())) return "";
   return parsed.toLocaleDateString(locale, { year: "numeric", month: "short", day: "numeric" });
 }
 
 function escapeHtml(value) {
-  if (!value) return "";
+  if (value == null) return "";
   return String(value)
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
@@ -191,7 +225,7 @@ function escapeHtml(value) {
 function stripHtml(html) {
   if (!html) return "";
   const withoutTags = html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
-  return withoutTags.length > 180 ? withoutTags.slice(0, 180) + "…" : withoutTags;
+  return withoutTags.length > 165 ? withoutTags.slice(0, 165) + "…" : withoutTags;
 }
 
 function extractImageFromHtml(html) {
@@ -208,7 +242,7 @@ function pickLang(value) {
 }
 
 function safeUrl(url) {
-  return /^https?:\/\//i.test(url) ? url : "#";
+  return typeof url === "string" && /^https?:\/\//i.test(url) ? url : "#";
 }
 
 function normalizeForCompare(text) {
@@ -229,14 +263,20 @@ function titleSimilarity(a, b) {
 }
 
 function showMessage(message) {
-  newsContainerElement.innerHTML = `<div class="status-message">${message}</div>`;
+  newsContainerElement.innerHTML = `<div class="status-message">${escapeHtml(message)}</div>`;
+}
+
+function showSkeletons(count = 6) {
+  newsContainerElement.innerHTML = Array.from({ length: count }, () =>
+    `<div class="skeleton-card" aria-hidden="true"></div>`
+  ).join("");
 }
 
 function normalizeArticle(article) {
   return {
     title: pickLang(article.title) || "Labarkouh News",
-    description: pickLang(article.description),
-    source: article.source?.name || article.source || "Labarkouh News",
+    description: pickLang(article.description) || "",
+    source: (article.source && article.source.name) || article.source || "Labarkouh News",
     lang: article.lang || "",
     publishedAt: article.publishedAt || new Date().toISOString(),
     image: article.image || PLACEHOLDER_IMAGE,
@@ -250,34 +290,27 @@ function renderNews(articles) {
     showMessage(text.noNews);
     return;
   }
-  const fragment = document.createDocumentFragment();
-  const temp = document.createElement("div");
 
-  temp.innerHTML = articles.map((rawArticle) => {
-    const article = normalizeArticle(rawArticle);
-    const langBadge = article.lang ? `<span class="lang-badge">${article.lang.toUpperCase()}</span>` : "";
+  const html = articles.map((raw) => {
+    const a = normalizeArticle(raw);
+    const langBadge = a.lang ? `<span class="lang-badge">${escapeHtml(a.lang.toUpperCase())}</span>` : "";
     return `
       <article class="news-card">
-        <img class="news-image" src="${escapeHtml(article.image)}" alt="" loading="lazy"
+        <img class="news-image" src="${escapeHtml(a.image)}" alt="" loading="lazy" decoding="async"
           onerror="this.onerror=null;this.src='${PLACEHOLDER_IMAGE}'" />
         <div class="news-content">
           <div class="news-meta">
-            <span class="news-meta-source">${escapeHtml(article.source)}${langBadge}</span>
-            <span>${formatDate(article.publishedAt)}</span>
+            <span class="news-meta-source">${escapeHtml(a.source)}${langBadge}</span>
+            <span>${formatDate(a.publishedAt)}</span>
           </div>
-          <h3 class="news-title">${escapeHtml(article.title)}</h3>
-          <p class="news-description">${escapeHtml(article.description)}</p>
-          <a class="read-link" href="${escapeHtml(safeUrl(article.url))}" target="_blank" rel="noopener noreferrer">${text.read}</a>
+          <h3 class="news-title">${escapeHtml(a.title)}</h3>
+          <p class="news-description">${escapeHtml(a.description)}</p>
+          <a class="read-link" href="${escapeHtml(safeUrl(a.url))}" target="_blank" rel="noopener noreferrer">${text.read}</a>
         </div>
-      </article>
-    `;
+      </article>`;
   }).join("");
 
-  while (temp.firstChild) {
-    fragment.appendChild(temp.firstChild);
-  }
-  newsContainerElement.innerHTML = "";
-  newsContainerElement.appendChild(fragment);
+  newsContainerElement.innerHTML = html;
 }
 
 function renderTicker() {
@@ -286,56 +319,41 @@ function renderTicker() {
     return;
   }
   tickerWrapElement.style.display = "flex";
-  const itemsHtml = tickerArticles.map((rawArticle) => {
-    const article = normalizeArticle(rawArticle);
-    return `<a class="ticker-item" href="${escapeHtml(safeUrl(article.url))}" target="_blank" rel="noopener noreferrer">${escapeHtml(article.title)}</a>`;
-  }).join(`<span class="ticker-sep">•</span>`);
-
-  tickerTrackElement.innerHTML = itemsHtml + `<span class="ticker-sep">•</span>` + itemsHtml;
+  const items = tickerArticles.slice(0, 14).map((raw) => {
+    const a = normalizeArticle(raw);
+    return `<a class="ticker-item" href="${escapeHtml(safeUrl(a.url))}" target="_blank" rel="noopener noreferrer">${escapeHtml(a.title)}</a>`;
+  });
+  const sep = `<span class="ticker-sep">•</span>`;
+  const content = items.join(sep);
+  tickerTrackElement.innerHTML = content + sep + content;
 
   requestAnimationFrame(() => {
     const width = tickerTrackElement.scrollWidth / 2;
-    const speed = 60;
-    const duration = Math.max(15, width / speed);
+    const duration = Math.max(20, width / 52);
     tickerTrackElement.style.animationDuration = duration + "s";
   });
 }
 
-async function loadTicker() {
-  const cached = getCachedArticles("breaking");
-  if (cached && cached.length) {
-    tickerArticles = cached;
-    renderTicker();
-  }
-  try {
-    const live = await fetchLiveCategory("breaking");
-    if (live && live.length) {
-      tickerArticles = live;
-      setCachedArticles("breaking", live);
-      renderTicker();
-    }
-  } catch (e) {
-    console.warn("Ticker load failed", e);
-  }
-}
-
+/* ---------- RSS parsing ---------- */
 function localName(el) {
-  return el.localName || el.tagName;
+  return (el.localName || el.tagName || "").toLowerCase();
 }
 
 function findFirstTag(node, names) {
+  const set = new Set(names.map((n) => n.toLowerCase()));
   const all = node.getElementsByTagName("*");
   for (let i = 0; i < all.length; i++) {
-    if (names.includes(localName(all[i]))) return all[i];
+    if (set.has(localName(all[i]))) return all[i];
   }
   return null;
 }
 
 function findAllTags(node, name) {
+  const n = name.toLowerCase();
   const all = node.getElementsByTagName("*");
   const out = [];
   for (let i = 0; i < all.length; i++) {
-    if (localName(all[i]) === name) out.push(all[i]);
+    if (localName(all[i]) === n) out.push(all[i]);
   }
   return out;
 }
@@ -345,9 +363,10 @@ function parseRssXml(xmlText) {
     const doc = new DOMParser().parseFromString(xmlText, "text/xml");
     if (doc.querySelector("parsererror")) return [];
 
-    const entryNodes = Array.from(doc.getElementsByTagName("*")).filter(
-      (el) => localName(el) === "item" || localName(el) === "entry"
-    );
+    const entryNodes = Array.from(doc.getElementsByTagName("*")).filter((el) => {
+      const n = localName(el);
+      return n === "item" || n === "entry";
+    });
 
     return entryNodes.map((node) => {
       const titleEl = findFirstTag(node, ["title"]);
@@ -356,8 +375,9 @@ function parseRssXml(xmlText) {
       let link = "";
       for (const el of findAllTags(node, "link")) {
         const href = el.getAttribute("href");
-        if (href) { link = href; break; }
-        if (el.textContent && el.textContent.trim()) { link = el.textContent.trim(); break; }
+        if (href && /^https?:/i.test(href)) { link = href; break; }
+        const txt = (el.textContent || "").trim();
+        if (txt && /^https?:/i.test(txt)) { link = txt; break; }
       }
 
       const descEl = findFirstTag(node, ["encoded", "description", "summary", "content"]);
@@ -368,8 +388,8 @@ function parseRssXml(xmlText) {
 
       let image = extractImageFromHtml(descriptionRaw);
       if (!image) {
-        const thumbEl = findFirstTag(node, ["thumbnail"]);
-        if (thumbEl) image = thumbEl.getAttribute("url");
+        const media = findFirstTag(node, ["thumbnail", "content"]);
+        if (media) image = media.getAttribute("url") || media.getAttribute("href");
       }
       if (!image) {
         const enclosure = findAllTags(node, "enclosure")
@@ -377,25 +397,23 @@ function parseRssXml(xmlText) {
         if (enclosure) image = enclosure.getAttribute("url");
       }
 
-      return {
-        title,
-        description: stripHtml(descriptionRaw),
-        pubDate,
-        image,
-        link
-      };
-    });
-  } catch (e) {
+      return { title, description: stripHtml(descriptionRaw), pubDate, image, link };
+    }).filter((it) => it.title);
+  } catch {
     return [];
   }
 }
 
+/* ---------- Fetching (FIXED: returns ALL items) ---------- */
 async function fetchViaProxy(feed, proxy) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), CONFIG.feedTimeoutMs);
   try {
     const apiUrl = proxy.url + encodeURIComponent(feed.url);
-    const response = await fetch(apiUrl, { signal: controller.signal });
+    const response = await fetch(apiUrl, {
+      signal: controller.signal,
+      cache: "no-store"
+    });
     if (!response.ok) throw new Error("HTTP " + response.status);
 
     let items = [];
@@ -403,41 +421,42 @@ async function fetchViaProxy(feed, proxy) {
       const data = await response.json();
       if (data.status !== "ok" || !Array.isArray(data.items)) throw new Error("Parse failed");
       items = data.items.map((item) => ({
-        title: item.title,
+        title: item.title || "",
         description: stripHtml(item.description || item.content || ""),
-        pubDate: item.pubDate,
-        image: item.thumbnail || item.enclosure?.link || extractImageFromHtml(item.description || item.content),
-        link: item.link
+        pubDate: item.pubDate || item.pubdate || "",
+        image: item.thumbnail || (item.enclosure && item.enclosure.link) || extractImageFromHtml(item.description || item.content),
+        link: item.link || item.url || ""
       }));
-    } else if (proxy.type === "allorigins") {
+    } else {
       const xmlText = await response.text();
       items = parseRssXml(xmlText);
     }
 
     if (!items || items.length === 0) throw new Error("No items");
 
-    const latest = items[0];
-    return [{
-      title: latest.title,
-      description: latest.description,
+    return items.map((it) => ({
+      title: it.title,
+      description: it.description,
       source: feed.name,
       lang: feed.lang,
-      publishedAt: latest.pubDate,
-      image: latest.image,
-      url: latest.link
-    }];
+      publishedAt: it.pubDate || new Date().toISOString(),
+      image: it.image || null,
+      url: it.link || "#"
+    }));
   } finally {
     clearTimeout(timeout);
   }
 }
 
 async function fetchOneFeed(feed) {
-  try {
-    return await Promise.any(CONFIG.proxies.map((proxy) => fetchViaProxy(feed, proxy)));
-  } catch (err) {
-    console.warn("Feed skip:", feed.name);
-    return [];
+  const attempts = CONFIG.proxies.map((proxy) =>
+    fetchViaProxy(feed, proxy).catch(() => null)
+  );
+  const results = await Promise.all(attempts);
+  for (const res of results) {
+    if (res && res.length > 0) return res;
   }
+  return [];
 }
 
 async function fetchLiveCategory(category) {
@@ -445,12 +464,12 @@ async function fetchLiveCategory(category) {
   if (!feedList || feedList.length === 0) return null;
 
   const results = await Promise.allSettled(
-    feedList.map(feed => fetchOneFeed(feed))
+    feedList.map((feed) => fetchOneFeed(feed))
   );
 
   const articles = results
-    .filter(r => r.status === "fulfilled")
-    .flatMap(r => r.value);
+    .filter((r) => r.status === "fulfilled")
+    .flatMap((r) => r.value || []);
 
   if (articles.length === 0) return null;
 
@@ -463,13 +482,159 @@ async function fetchLiveCategory(category) {
 
   const unique = [];
   for (const article of articles) {
-    const isDuplicate = unique.some(
+    if (!article.title) continue;
+    const isDup = unique.some(
       (kept) => titleSimilarity(kept.title, article.title) >= CONFIG.similarityThreshold
     );
-    if (!isDuplicate) unique.push(article);
+    if (!isDup) unique.push(article);
   }
 
   return unique.slice(0, CONFIG.maxArticles);
+}
+
+/* ---------- Notifications ---------- */
+function isNotificationSupported() {
+  return "Notification" in window && "serviceWorker" in navigator;
+}
+
+function updateNotifyButtonUI() {
+  const text = getCurrentText();
+  if (!notifyButtonElement || !notifyButtonTextElement) return;
+
+  if (!isNotificationSupported()) {
+    notifyButtonTextElement.textContent = text.notifyUnsupported;
+    notifyButtonElement.disabled = true;
+    notifyButtonElement.classList.remove("enabled");
+    return;
+  }
+
+  const permission = Notification.permission;
+  if (permission === "granted" && notificationsEnabled) {
+    notifyButtonTextElement.textContent = text.notifyEnabled;
+    notifyButtonElement.classList.add("enabled");
+    notifyButtonElement.disabled = false;
+  } else if (permission === "denied") {
+    notifyButtonTextElement.textContent = text.notifyDenied;
+    notifyButtonElement.classList.remove("enabled");
+    notifyButtonElement.disabled = true;
+  } else {
+    notifyButtonTextElement.textContent = text.notifyEnable;
+    notifyButtonElement.classList.remove("enabled");
+    notifyButtonElement.disabled = false;
+  }
+}
+
+async function enableNotifications() {
+  if (!isNotificationSupported()) return;
+
+  if (Notification.permission === "granted") {
+    notificationsEnabled = true;
+    localStorage.setItem("labarkouh_notify", "1");
+    updateNotifyButtonUI();
+    showLocalNotification(
+      getCurrentText().notifyEnabled,
+      currentLanguage === "ar"
+        ? "ستصلك إشعارات عند وصول أخبار عاجلة جديدة"
+        : currentLanguage === "fr"
+          ? "Vous recevrez des alertes pour les actualités urgentes"
+          : "You will receive alerts for breaking news"
+    );
+    return;
+  }
+
+  if (Notification.permission === "denied") {
+    updateNotifyButtonUI();
+    return;
+  }
+
+  try {
+    const result = await Notification.requestPermission();
+    if (result === "granted") {
+      notificationsEnabled = true;
+      localStorage.setItem("labarkouh_notify", "1");
+      showLocalNotification(
+        getCurrentText().notifyEnabled,
+        currentLanguage === "ar"
+          ? "ستصلك إشعارات عند وصول أخبار عاجلة جديدة"
+          : currentLanguage === "fr"
+            ? "Vous recevrez des alertes pour les actualités urgentes"
+            : "You will receive alerts for breaking news"
+      );
+    } else {
+      notificationsEnabled = false;
+      localStorage.setItem("labarkouh_notify", "0");
+    }
+    updateNotifyButtonUI();
+  } catch (e) {
+    console.warn("Notification permission error", e);
+  }
+}
+
+function showLocalNotification(title, body, url) {
+  if (!isNotificationSupported() || Notification.permission !== "granted" || !notificationsEnabled) {
+    return;
+  }
+
+  const options = {
+    body: body || "",
+    icon: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect fill='%23dc2626' width='100' height='100' rx='22'/%3E%3Ctext x='50' y='68' font-size='52' text-anchor='middle' fill='white' font-family='system-ui' font-weight='800'%3EL%3C/text%3E%3C/svg%3E",
+    badge: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect fill='%23dc2626' width='100' height='100' rx='22'/%3E%3Ctext x='50' y='68' font-size='52' text-anchor='middle' fill='white' font-family='system-ui' font-weight='800'%3EL%3C/text%3E%3C/svg%3E",
+    tag: "labarkouh-breaking",
+    renotify: true,
+    requireInteraction: false,
+    data: { url: url || window.location.href }
+  };
+
+  if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+    navigator.serviceWorker.ready.then((reg) => {
+      reg.showNotification(title, options).catch(() => {
+        try { new Notification(title, options); } catch (_) {}
+      });
+    });
+  } else {
+    try {
+      new Notification(title, options);
+    } catch (_) {}
+  }
+}
+
+function maybeNotifyNewBreaking(articles) {
+  if (!articles || articles.length === 0) return;
+  if (!notificationsEnabled || Notification.permission !== "granted") return;
+
+  const top = articles[0];
+  const title = (top.title || "").trim();
+  if (!title || title === lastNotifiedTitle) return;
+
+  lastNotifiedTitle = title;
+  localStorage.setItem("labarkouh_last_notify", title);
+
+  const text = getCurrentText();
+  showLocalNotification(
+    text.notifyNew + " — Labarkouh",
+    title,
+    top.url || window.location.href
+  );
+}
+
+/* ---------- Load ---------- */
+async function loadTicker() {
+  const cached = getCachedArticles("breaking");
+  if (cached && cached.length) {
+    tickerArticles = cached;
+    renderTicker();
+  }
+  try {
+    const live = await fetchLiveCategory("breaking");
+    if (live && live.length) {
+      tickerArticles = live;
+      setCachedArticles("breaking", live);
+      renderTicker();
+      maybeNotifyNewBreaking(live);
+    }
+  } catch (e) {
+    console.warn("Ticker load failed", e);
+  }
 }
 
 async function loadNews(forceRefresh = false) {
@@ -481,14 +646,21 @@ async function loadNews(forceRefresh = false) {
     if (cached && cached.length > 0) {
       renderNews(cached);
     } else {
-      showMessage(text.loading);
-      renderNews(demoNews[currentCategory] || []);
+      showSkeletons(6);
+      setTimeout(() => {
+        if (myToken === requestToken && newsContainerElement.querySelector(".skeleton-card")) {
+          renderNews(demoNews[currentCategory] || []);
+        }
+      }, 2000);
     }
   } else {
-    showMessage(text.loading);
+    showSkeletons(6);
   }
 
   if (!CONFIG.useLiveFeeds || !CONFIG.feeds[currentCategory]) return;
+
+  isLoading = true;
+  refreshButtonElement.disabled = true;
 
   try {
     const liveArticles = await fetchLiveCategory(currentCategory);
@@ -497,23 +669,32 @@ async function loadNews(forceRefresh = false) {
     if (liveArticles && liveArticles.length > 0) {
       setCachedArticles(currentCategory, liveArticles);
       renderNews(liveArticles);
+    } else if (!getCachedArticles(currentCategory)) {
+      renderNews(demoNews[currentCategory] || []);
     }
   } catch (error) {
     console.error(error);
+    if (myToken === requestToken && !getCachedArticles(currentCategory)) {
+      showMessage(text.error);
+    }
+  } finally {
+    isLoading = false;
+    refreshButtonElement.disabled = false;
   }
 }
 
 function selectCategory(category) {
   if (currentCategory === category) return;
   currentCategory = category;
-  categoryButtons.forEach((button) => {
-    button.classList.toggle("active", button.dataset.category === category);
+  categoryButtons.forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.category === category);
   });
   loadNews(false);
 }
 
-languageSelectElement.addEventListener("change", (event) => {
-  currentLanguage = event.target.value;
+/* ---------- Events ---------- */
+languageSelectElement.addEventListener("change", (e) => {
+  currentLanguage = e.target.value;
   localStorage.setItem("language", currentLanguage);
   updateInterface();
   loadNews(false);
@@ -521,6 +702,7 @@ languageSelectElement.addEventListener("change", (event) => {
 });
 
 refreshButtonElement.addEventListener("click", () => {
+  if (isLoading) return;
   localStorage.removeItem(getCacheKey(currentCategory));
   loadNews(true);
 });
@@ -529,17 +711,36 @@ categoryButtons.forEach((button) => {
   button.addEventListener("click", () => selectCategory(button.dataset.category));
 });
 
-currentYearElement.textContent = new Date().getFullYear();
+if (notifyButtonElement) {
+  notifyButtonElement.addEventListener("click", () => {
+    if (Notification.permission === "granted" && notificationsEnabled) {
+      notificationsEnabled = false;
+      localStorage.setItem("labarkouh_notify", "0");
+      updateNotifyButtonUI();
+    } else {
+      enableNotifications();
+    }
+  });
+}
 
+/* ---------- Init ---------- */
+currentYearElement.textContent = new Date().getFullYear();
 updateInterface();
 loadNews(false);
 loadTicker();
 setInterval(loadTicker, 3 * 60 * 1000);
 
+if (isNotificationSupported() && Notification.permission === "granted" && localStorage.getItem("labarkouh_notify") === "1") {
+  notificationsEnabled = true;
+}
+updateNotifyButtonUI();
+
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker.register("./sw.js")
-      .then(() => console.log("SW ready"))
-      .catch((err) => console.error("SW failed:", err));
+      .then((reg) => {
+        console.log("SW ready", reg.scope);
+      })
+      .catch(() => {});
   });
-}
+} 
