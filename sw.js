@@ -1,4 +1,4 @@
-const CACHE_NAME = "labarkouh-news-v5";
+const CACHE_NAME = "labarkouh-news-v6";
 
 const STATIC_FILES = [
   "./",
@@ -34,12 +34,21 @@ self.addEventListener("fetch", (event) => {
 
   const url = event.request.url;
 
-  // Network-first للـ API (الأخبار)
+  // Stale-while-revalidate للأخبار: يعرض الكاش فوراً ويحدّثه بالخلفية
   if (url.includes("rss2json.com") || url.includes("allorigins.win") || url.includes("api.")) {
     event.respondWith(
-      fetch(event.request)
-        .then((response) => response)
-        .catch(() => caches.match(event.request))
+      caches.open(CACHE_NAME).then(async (cache) => {
+        const cached = await cache.match(event.request);
+        const fetchPromise = fetch(event.request)
+          .then((response) => {
+            if (response && response.status === 200) {
+              cache.put(event.request, response.clone());
+            }
+            return response;
+          })
+          .catch(() => cached);
+        return cached || fetchPromise;
+      })
     );
     return;
   }
