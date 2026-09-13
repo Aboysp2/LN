@@ -211,8 +211,6 @@ function safeUrl(url) {
   return /^https?:\/\//i.test(url) ? url : "#";
 }
 
-// ---------- كشف الأخبار المتشابهة (مو بس التطابق الحرفي) ----------
-
 function normalizeForCompare(text) {
   return (text || "")
     .toLowerCase()
@@ -282,8 +280,6 @@ function renderNews(articles) {
   newsContainerElement.appendChild(fragment);
 }
 
-// ---------- الشريط المتحرك ----------
-
 function renderTicker() {
   if (!tickerArticles || tickerArticles.length === 0) {
     tickerWrapElement.style.display = "none";
@@ -299,7 +295,7 @@ function renderTicker() {
 
   requestAnimationFrame(() => {
     const width = tickerTrackElement.scrollWidth / 2;
-    const speed = 60; // px/ثانية تقريباً
+    const speed = 60;
     const duration = Math.max(15, width / speed);
     tickerTrackElement.style.animationDuration = duration + "s";
   });
@@ -322,8 +318,6 @@ async function loadTicker() {
     console.warn("Ticker load failed", e);
   }
 }
-
-// ---------- محرك تحليل RSS/Atom XML (لخط allorigins) ----------
 
 function localName(el) {
   return el.localName || el.tagName;
@@ -396,8 +390,6 @@ function parseRssXml(xmlText) {
   }
 }
 
-// ---------- جلب الأخبار ----------
-
 async function fetchViaProxy(feed, proxy) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), CONFIG.feedTimeoutMs);
@@ -462,7 +454,6 @@ async function fetchLiveCategory(category) {
 
   if (articles.length === 0) return null;
 
-  // الأولوية: نفس لغة الواجهة أولاً، ثم الأحدث
   articles.sort((a, b) => {
     const aMatch = a.lang === currentLanguage ? 1 : 0;
     const bMatch = b.lang === currentLanguage ? 1 : 0;
@@ -470,7 +461,6 @@ async function fetchLiveCategory(category) {
     return new Date(b.publishedAt) - new Date(a.publishedAt);
   });
 
-  // إزالة الأخبار المتشابهة القادمة من مصادر مختلفة (نفس الحدث)
   const unique = [];
   for (const article of articles) {
     const isDuplicate = unique.some(
@@ -544,7 +534,7 @@ currentYearElement.textContent = new Date().getFullYear();
 updateInterface();
 loadNews(false);
 loadTicker();
-setInterval(loadTicker, CONFIG.cacheTTL);
+setInterval(loadTicker, 3 * 60 * 1000);
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
