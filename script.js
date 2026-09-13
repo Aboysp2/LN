@@ -13,20 +13,24 @@ const CONFIG = {
     chad: [
       { name: "Tchadinfos", url: "https://tchadinfos.com/feed/", lang: "fr" },
       { name: "Alwihda Info", url: "https://www.alwihdainfo.com/xml/syndication.rss", lang: "fr" },
-      { name: "Journal du Tchad", url: "https://www.journaldutchad.com/feed/", lang: "fr" }
+      { name: "Journal du Tchad", url: "https://www.journaldutchad.com/feed/", lang: "fr" },
+      { name: "RFI Afrique", url: "https://www.rfi.fr/fr/afrique/rss", lang: "fr" }
     ],
     africa: [
+      { name: "BBC Arabic", url: "https://feeds.bbci.co.uk/arabic/rss.xml", lang: "ar" },
+      { name: "BBC Africa", url: "https://feeds.bbci.co.uk/news/world/africa/rss.xml", lang: "en" },
       { name: "Africanews", url: "https://www.africanews.com/feed/", lang: "en" },
       { name: "BBC Afrique", url: "https://feeds.bbci.co.uk/afrique/rss.xml", lang: "fr" },
+      { name: "RFI Afrique", url: "https://www.rfi.fr/fr/afrique/rss", lang: "fr" },
       { name: "France 24 Afrique", url: "https://www.france24.com/fr/afrique/rss", lang: "fr" },
       { name: "Al Jazeera", url: "https://www.aljazeera.com/xml/rss/all.xml", lang: "en" }
     ],
     world: [
       { name: "BBC Arabic", url: "https://feeds.bbci.co.uk/arabic/rss.xml", lang: "ar" },
       { name: "BBC World", url: "https://feeds.bbci.co.uk/news/world/rss.xml", lang: "en" },
+      { name: "BBC News", url: "https://feeds.bbci.co.uk/news/rss.xml", lang: "en" },
       { name: "Al Jazeera", url: "https://www.aljazeera.com/xml/rss/all.xml", lang: "en" },
-      { name: "France 24", url: "https://www.france24.com/fr/rss", lang: "fr" },
-      { name: "BBC News", url: "https://feeds.bbci.co.uk/news/rss.xml", lang: "en" }
+      { name: "France 24", url: "https://www.france24.com/fr/rss", lang: "fr" }
     ],
     sports: [
       { name: "BBC Sport", url: "https://feeds.bbci.co.uk/sport/rss.xml", lang: "en" },
@@ -96,7 +100,7 @@ const demoNews = {
     url: "https://news.google.com"
   }],
   sports: [{
-    title: { ar: "آخر أخبار الرياضة", fr: "Dernières actualités sportives", en: "Latest sports news" },
+    title: { ar: "آخر أخبار الرياضة", fr: "Dernières actualités سبورتية", en: "Latest sports news" },
     description: { ar: "أهم نتائج ومباريات كرة القدم والرياضات العالمية.", fr: "Les principaux résultats et matchs de football et de sports mondiaux.", en: "Top results and matches in football and world sports." },
     source: "Sports News", publishedAt: new Date().toISOString(), image: PLACEHOLDER_IMAGE,
     url: "https://www.google.com/search?q=sports+latest+news"
@@ -325,7 +329,7 @@ function parseRssXml(xmlText) {
   }
 }
 
-// ---------- جلب الأخبار (سباق بروكسيات بالتوازي) ----------
+// ---------- جلب الأخبار (سباق بروكسيات + خبر واحد فقط لكل مصدر) ----------
 
 async function fetchViaProxy(feed, proxy) {
   const controller = new AbortController();
@@ -353,15 +357,17 @@ async function fetchViaProxy(feed, proxy) {
 
     if (!items || items.length === 0) throw new Error("No items");
 
-    return items.slice(0, 12).map((item) => ({
-      title: item.title,
-      description: item.description,
+    // خبر واحد فقط (الأحدث) من كل مصدر — يمنع تكرار نفس المصدر بعدة أخبار
+    const latest = items[0];
+    return [{
+      title: latest.title,
+      description: latest.description,
       source: feed.name,
       lang: feed.lang,
-      publishedAt: item.pubDate,
-      image: item.image,
-      url: item.link
-    }));
+      publishedAt: latest.pubDate,
+      image: latest.image,
+      url: latest.link
+    }];
   } finally {
     clearTimeout(timeout);
   }
@@ -399,7 +405,14 @@ async function fetchLiveCategory(category) {
     unique.push(a);
   }
 
-  unique.sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt));
+  // الأولوية: نفس لغة الواجهة الحالية أولاً، ثم الأحدث تاريخاً
+  unique.sort((a, b) => {
+    const aMatch = a.lang === currentLanguage ? 1 : 0;
+    const bMatch = b.lang === currentLanguage ? 1 : 0;
+    if (aMatch !== bMatch) return bMatch - aMatch;
+    return new Date(b.publishedAt) - new Date(a.publishedAt);
+  });
+
   return unique.slice(0, CONFIG.maxArticles);
 }
 
@@ -447,8 +460,7 @@ languageSelectElement.addEventListener("change", (event) => {
   currentLanguage = event.target.value;
   localStorage.setItem("language", currentLanguage);
   updateInterface();
-  const cached = getCachedArticles(currentCategory);
-  renderNews(cached && cached.length ? cached : demoNews[currentCategory] || []);
+  loadNews(false); // لازم يعيد الترتيب حسب اللغة الجديدة
 });
 
 refreshButtonElement.addEventListener("click", () => {
