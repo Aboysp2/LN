@@ -1,35 +1,37 @@
 const CONFIG = {
   useLiveFeeds: true,
-  feedTimeoutMs: 4500,
+  feedTimeoutMs: 3500,
   maxArticles: 24,
   cacheTTL: 8 * 60 * 1000,
   feeds: {
     breaking: [
-      { name: "Tchadinfos", url: "https://tchadinfos.com/feed/" },
-      { name: "Alwihda Info", url: "https://www.alwihdainfo.com/xml/syndication.rss" },
-      { name: "Journal du Tchad", url: "https://www.journaldutchad.com/feed/" }
+      { name: "BBC Arabic", url: "https://feeds.bbci.co.uk/arabic/rss.xml", lang: "ar" },
+      { name: "Tchadinfos", url: "https://tchadinfos.com/feed/", lang: "fr" },
+      { name: "Alwihda Info", url: "https://www.alwihdainfo.com/xml/syndication.rss", lang: "fr" },
+      { name: "Journal du Tchad", url: "https://www.journaldutchad.com/feed/", lang: "fr" }
     ],
     chad: [
-      { name: "Tchadinfos", url: "https://tchadinfos.com/feed/" },
-      { name: "Alwihda Info", url: "https://www.alwihdainfo.com/xml/syndication.rss" },
-      { name: "Journal du Tchad", url: "https://www.journaldutchad.com/feed/" }
+      { name: "Tchadinfos", url: "https://tchadinfos.com/feed/", lang: "fr" },
+      { name: "Alwihda Info", url: "https://www.alwihdainfo.com/xml/syndication.rss", lang: "fr" },
+      { name: "Journal du Tchad", url: "https://www.journaldutchad.com/feed/", lang: "fr" }
     ],
     africa: [
-      { name: "Africanews", url: "https://www.africanews.com/feed/" },
-      { name: "BBC Afrique", url: "https://feeds.bbci.co.uk/afrique/rss.xml" },
-      { name: "France 24 Afrique", url: "https://www.france24.com/fr/afrique/rss" },
-      { name: "Al Jazeera", url: "https://www.aljazeera.com/xml/rss/all.xml" }
+      { name: "Africanews", url: "https://www.africanews.com/feed/", lang: "en" },
+      { name: "BBC Afrique", url: "https://feeds.bbci.co.uk/afrique/rss.xml", lang: "fr" },
+      { name: "France 24 Afrique", url: "https://www.france24.com/fr/afrique/rss", lang: "fr" },
+      { name: "Al Jazeera", url: "https://www.aljazeera.com/xml/rss/all.xml", lang: "en" }
     ],
     world: [
-      { name: "BBC World", url: "https://feeds.bbci.co.uk/news/world/rss.xml" },
-      { name: "Al Jazeera", url: "https://www.aljazeera.com/xml/rss/all.xml" },
-      { name: "France 24", url: "https://www.france24.com/fr/rss" },
-      { name: "BBC News", url: "https://feeds.bbci.co.uk/news/rss.xml" }
+      { name: "BBC Arabic", url: "https://feeds.bbci.co.uk/arabic/rss.xml", lang: "ar" },
+      { name: "BBC World", url: "https://feeds.bbci.co.uk/news/world/rss.xml", lang: "en" },
+      { name: "Al Jazeera", url: "https://www.aljazeera.com/xml/rss/all.xml", lang: "en" },
+      { name: "France 24", url: "https://www.france24.com/fr/rss", lang: "fr" },
+      { name: "BBC News", url: "https://feeds.bbci.co.uk/news/rss.xml", lang: "en" }
     ],
     sports: [
-      { name: "BBC Sport", url: "https://feeds.bbci.co.uk/sport/rss.xml" },
-      { name: "France 24 Sport", url: "https://www.france24.com/fr/sports/rss" },
-      { name: "Africanews", url: "https://www.africanews.com/feed/" }
+      { name: "BBC Sport", url: "https://feeds.bbci.co.uk/sport/rss.xml", lang: "en" },
+      { name: "France 24 Sport", url: "https://www.france24.com/fr/sports/rss", lang: "fr" },
+      { name: "Africanews", url: "https://www.africanews.com/feed/", lang: "en" }
     ]
   },
   proxies: [
@@ -207,6 +209,7 @@ function normalizeArticle(article) {
     title: pickLang(article.title) || "Labarkouh News",
     description: pickLang(article.description),
     source: article.source?.name || article.source || "Labarkouh News",
+    lang: article.lang || "",
     publishedAt: article.publishedAt || new Date().toISOString(),
     image: article.image || PLACEHOLDER_IMAGE,
     url: article.url || "#"
@@ -224,13 +227,14 @@ function renderNews(articles) {
 
   temp.innerHTML = articles.map((rawArticle) => {
     const article = normalizeArticle(rawArticle);
+    const langBadge = article.lang ? `<span class="lang-badge">${article.lang.toUpperCase()}</span>` : "";
     return `
       <article class="news-card">
         <img class="news-image" src="${escapeHtml(article.image)}" alt="" loading="lazy"
           onerror="this.onerror=null;this.src='${PLACEHOLDER_IMAGE}'" />
         <div class="news-content">
           <div class="news-meta">
-            <span>${escapeHtml(article.source)}</span>
+            <span class="news-meta-source">${escapeHtml(article.source)}${langBadge}</span>
             <span>${formatDate(article.publishedAt)}</span>
           </div>
           <h3 class="news-title">${escapeHtml(article.title)}</h3>
@@ -321,53 +325,55 @@ function parseRssXml(xmlText) {
   }
 }
 
-// ---------- جلب الأخبار ----------
+// ---------- جلب الأخبار (سباق بروكسيات بالتوازي) ----------
+
+async function fetchViaProxy(feed, proxy) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), CONFIG.feedTimeoutMs);
+  try {
+    const apiUrl = proxy.url + encodeURIComponent(feed.url);
+    const response = await fetch(apiUrl, { signal: controller.signal });
+    if (!response.ok) throw new Error("HTTP " + response.status);
+
+    let items = [];
+    if (proxy.type === "rss2json") {
+      const data = await response.json();
+      if (data.status !== "ok" || !Array.isArray(data.items)) throw new Error("Parse failed");
+      items = data.items.map((item) => ({
+        title: item.title,
+        description: stripHtml(item.description || item.content || ""),
+        pubDate: item.pubDate,
+        image: item.thumbnail || item.enclosure?.link || extractImageFromHtml(item.description || item.content),
+        link: item.link
+      }));
+    } else if (proxy.type === "allorigins") {
+      const xmlText = await response.text();
+      items = parseRssXml(xmlText);
+    }
+
+    if (!items || items.length === 0) throw new Error("No items");
+
+    return items.slice(0, 12).map((item) => ({
+      title: item.title,
+      description: item.description,
+      source: feed.name,
+      lang: feed.lang,
+      publishedAt: item.pubDate,
+      image: item.image,
+      url: item.link
+    }));
+  } finally {
+    clearTimeout(timeout);
+  }
+}
 
 async function fetchOneFeed(feed) {
-  for (const proxy of CONFIG.proxies) {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), CONFIG.feedTimeoutMs);
-    try {
-      const apiUrl = proxy.url + encodeURIComponent(feed.url);
-      const response = await fetch(apiUrl, { signal: controller.signal });
-      if (!response.ok) throw new Error("HTTP " + response.status);
-
-      let items = [];
-
-      if (proxy.type === "rss2json") {
-        const data = await response.json();
-        if (data.status !== "ok" || !Array.isArray(data.items)) {
-          throw new Error("Parse failed");
-        }
-        items = data.items.map((item) => ({
-          title: item.title,
-          description: stripHtml(item.description || item.content || ""),
-          pubDate: item.pubDate,
-          image: item.thumbnail || item.enclosure?.link || extractImageFromHtml(item.description || item.content),
-          link: item.link
-        }));
-      } else if (proxy.type === "allorigins") {
-        const xmlText = await response.text();
-        items = parseRssXml(xmlText);
-      }
-
-      if (!items || items.length === 0) throw new Error("No items");
-
-      return items.slice(0, 12).map((item) => ({
-        title: item.title,
-        description: item.description,
-        source: feed.name,
-        publishedAt: item.pubDate,
-        image: item.image,
-        url: item.link
-      }));
-    } catch (err) {
-      console.warn("Feed skip:", feed.name, proxy.type, err.message);
-    } finally {
-      clearTimeout(timeout);
-    }
+  try {
+    return await Promise.any(CONFIG.proxies.map((proxy) => fetchViaProxy(feed, proxy)));
+  } catch (err) {
+    console.warn("Feed skip:", feed.name);
+    return [];
   }
-  return [];
 }
 
 async function fetchLiveCategory(category) {
